@@ -13,7 +13,7 @@ class Label(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(Label, self).__init__(parent)
         self.image = QtGui.QPixmap("TestImage.tif")
-        self.drawing = False
+        self.drawing = True
         self.lastPoint = QtCore.QPoint()
 
     def paintEvent(self, event):
