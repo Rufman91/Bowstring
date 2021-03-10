@@ -185,8 +185,6 @@ class MainWindow(QMainWindow):
         self.send_instructions_to_jpk()
 
     def getPos(self , event):
-        print(self.CurrentTipPosition)
-        print(self.ImageFullfile)
         x = event.pos().x()
         y = event.pos().y()
         self.Points.append([x,y])
