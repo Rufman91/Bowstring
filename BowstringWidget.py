@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
         toolbar.setIconSize(QSize(64,64))
         self.addToolBar(toolbar)
         
-        self.BowModeButton = QAction(QIcon('icons/Bow.jpg'),"Your button", self)
+        self.BowModeButton = QAction(QIcon('icons/Bow.jpg'),"Bowstring mode", self)
         self.BowModeButton.setStatusTip("Design and run a Bowstring experiment")
         self.BowModeButton.triggered.connect(self.onBowModeButtonClick)
         self.BowModeButton.setCheckable(True)
@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
         
         toolbar.addSeparator()
 
-        self.LithModeButton = QAction(QIcon("icons/Chisel.jpg"), "Your button2", self)
+        self.LithModeButton = QAction(QIcon("icons/Chisel.png"), "Nanolithography mode", self)
         self.LithModeButton.setStatusTip("This is just a placeholder for Nanolithography mode")
         self.LithModeButton.triggered.connect(self.onLithModeButtonClick)
         self.LithModeButton.setCheckable(True)
