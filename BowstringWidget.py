@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         super(MainWindow,self).__init__(*args,**kwargs)
         
         # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY ImageFullfile
-        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6 path\to\eternity
+        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6 'TestImage.tif'
         if len(sys.argv)<3:
             self.ImageFullfile = 'TestImage.tif'
             self.CurrentTipPosition = [1.5e-6, 1e-6]
@@ -91,10 +91,11 @@ class MainWindow(QMainWindow):
         
         self.PointCounter = 0
         self.Points = list()
-        self.StrainRate = []
-        self.FinalStrain = []
-        self.PixelSize = 0.5
-        self.Magnification = 200
+        self.StrainRate = float(2e-6)
+        self.FinalStrain = float(.2)
+        self.PixelSize = float(0.5e-6)
+        self.Magnification = float(200)
+        self.Tip2HalfPointBuffer = float(5e-6)
         
         toolbar = QToolBar('My main toolbar')
         toolbar.setIconSize(QSize(64,64))
@@ -133,25 +134,30 @@ class MainWindow(QMainWindow):
         Image.mousePressEvent = self.getPos
         
         InputText1 = QLabel('Choose a strain rate [um/s]:')
-        Input1 = QLineEdit()
+        Input1 = QLineEdit('%d' % (self.StrainRate*1e6))
         Input1.setMaxLength(5)
         Input1.setValidator(QDoubleValidator())
         Input1.textChanged.connect(self.set_strain_rate)
         InputText2 = QLabel('Choose the final strain [%]:')
-        Input2 = QLineEdit()
+        Input2 = QLineEdit('%d' % (self.FinalStrain*100))
         Input2.setMaxLength(5)
         Input2.setValidator(QDoubleValidator())
         Input2.textChanged.connect(self.set_final_strain)
         InputText3 = QLabel('Camera Pixel Size [um]:')
-        Input3 = QLineEdit('%d' % self.PixelSize)
+        Input3 = QLineEdit('%d' % (self.PixelSize*1e6))
         Input3.setMaxLength(5)
         Input3.setValidator(QDoubleValidator())
         Input3.textChanged.connect(self.set_pixel_size)
         InputText4 = QLabel('Microscope magnification:')
-        Input4 = QLineEdit('%d' % self.Magnification)
+        Input4 = QLineEdit('%d' % (self.Magnification))
         Input4.setMaxLength(5)
         Input4.setValidator(QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
+        InputText5 = QLabel('Tip-to-Halfpoint Buffer [um]:')
+        Input5 = QLineEdit('%d' % (self.Tip2HalfPointBuffer*1e6))
+        Input5.setMaxLength(5)
+        Input5.setValidator(QDoubleValidator())
+        Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
         
         StartButton = QPushButton('Start Experiment')
         StartButton.mousePressEvent = self.start_experiment
@@ -159,7 +165,7 @@ class MainWindow(QMainWindow):
         Grid = QGridLayout()
         Grid.setSpacing(10)
         Grid.addWidget(self.ImageDescription,0,0)
-        Grid.addWidget(Image,1,0,6,1)
+        Grid.addWidget(Image,1,0,10,1)
         Grid.addWidget(InputText1,1,1)
         Grid.addWidget(Input1,1,2)
         Grid.addWidget(InputText2,2,1)
@@ -168,7 +174,9 @@ class MainWindow(QMainWindow):
         Grid.addWidget(Input3,3,2)
         Grid.addWidget(InputText4,4,1)
         Grid.addWidget(Input4,4,2)
-        Grid.addWidget(StartButton,5,1,1,2)
+        Grid.addWidget(InputText5,5,1)
+        Grid.addWidget(Input5,5,2)
+        Grid.addWidget(StartButton,6,1,1,2)
         
         Widget = QWidget()
         Widget.setLayout(Grid)
@@ -216,7 +224,6 @@ class MainWindow(QMainWindow):
             
     def set_strain_rate(self,s):
         self.StrainRate = float(s)*1e-6
-        print(self.StrainRate)
         self.draw_geometry()
         
     def set_pixel_size(self,s):
@@ -230,6 +237,18 @@ class MainWindow(QMainWindow):
     def set_final_strain(self,s):
         self.FinalStrain = float(s)/100
         self.draw_geometry()
+        
+    def set_tip_to_halfpoint_buffer(self,s):
+        self.Tip2HalfPointBuffer = float(s)*1e-6
+        self.draw_geometry
+        
+    def transform_coordinates_image2rl(self,InPoint):
+        
+        return OutPoint
+        
+    def transform_coordinates_rl2image(self,InPoint):
+        
+        return OutPoint
             
     def draw_geometry(self):
          Bool = self.check_sufficient_information()
@@ -243,11 +262,14 @@ class MainWindow(QMainWindow):
         A2 = np.array(self.Points[1])
         T = np.array(self.Points[2])
         
-        self.T = 1
+        self.InitialTipPosition = 1
         self.Anchor1 = A1 #Real world position of anchor 1
         self.Anchor2 = A2 #Real world position of anchor 2
-        self.SegmentLength = np.linalg.norm(self.A1-self.A2)
-        self.HalfPoint = (self.A1+self.A2)/2
+        self.SegmentLength = np.linalg.norm(self.Anchor1-self.Anchor2)
+        self.HalfPoint = (self.Anchor1+self.Anchor2)/2
+        self.SegmentDirection = (self.Anchor1 - self.Anchor2)/self.SegmentLength
+        self.PerpendicularDirection = np.array([-self.SegmentDirection[1],self.SegmentDirection[0]])
+        
         print('foo')
 
     def check_sufficient_information(self):
@@ -256,6 +278,11 @@ class MainWindow(QMainWindow):
         else:
             Bool = False
         return Bool
+    
+    def send_instructions_to_jpk(self):
+        print('Anchor1 ' + str(self.Anchor1))
+        print('Anchor2 ' + str(self.Anchor2))
+        print('HalfPoint ' + str(self.HalfPoint))
 
 def main():
     app = QApplication(sys.argv)
