@@ -80,21 +80,19 @@ class MainWindow(QMainWindow):
     def __init__(self,*args,**kwargs):
         super(MainWindow,self).__init__(*args,**kwargs)
         
-        # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY ImageFullfile
-        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6 'TestImage.tif'
-        if len(sys.argv)<3:
-            self.ImageFullfile = 'TestImage.tif'
-            self.CurrentTipPosition = [1.5e-6, 1e-6]
+        # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY
+        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6
+        if len(sys.argv)<2:
+            self.StartingTipPosition = [1.5e-6, 1e-6]
         else:
-            self.ImageFullfile = sys.argv[3]
-            self.CurrentTipPosition = [float(sys.argv[1]) , float(sys.argv[2])]
+            self.StartingTipPosition = [float(sys.argv[1]) , float(sys.argv[2])]
         
         self.PointCounter = 0
         self.Points = list()
         self.StrainRate = float(2e-6)
         self.FinalStrain = float(.2)
-        self.PixelSize = float(0.5e-6)
-        self.Magnification = float(200)
+        self.PixelSize = float(4.65e-6)
+        self.Magnification = float(10)
         self.Tip2HalfPointBuffer = float(5e-6)
         
         toolbar = QToolBar('My main toolbar')
@@ -126,36 +124,39 @@ class MainWindow(QMainWindow):
         self.ImageDescription = QLabel(self.ImageDescriptionPrompts[self.PointCounter])
         self.ImageDescription.setFont(QFont('Arial',32))
         
+        self.Pixmap = QPixmap('TestImage.tif')
         Image = QLabel()
-        Image.setPixmap(QPixmap('TestImage.tif'))
+        Image.setPixmap(self.Pixmap)
         Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         Image.setAcceptDrops(True)
         Image.dropEvent = self.drop_new_image
         Image.mousePressEvent = self.getPos
         
+        self.MaxEditLength = 10
+        
         InputText1 = QLabel('Choose a strain rate [um/s]:')
         Input1 = QLineEdit('%d' % (self.StrainRate*1e6))
-        Input1.setMaxLength(5)
+        Input1.setMaxLength(self.MaxEditLength)
         Input1.setValidator(QDoubleValidator())
         Input1.textChanged.connect(self.set_strain_rate)
         InputText2 = QLabel('Choose the final strain [%]:')
         Input2 = QLineEdit('%d' % (self.FinalStrain*100))
-        Input2.setMaxLength(5)
+        Input2.setMaxLength(self.MaxEditLength)
         Input2.setValidator(QDoubleValidator())
         Input2.textChanged.connect(self.set_final_strain)
         InputText3 = QLabel('Camera Pixel Size [um]:')
-        Input3 = QLineEdit('%d' % (self.PixelSize*1e6))
-        Input3.setMaxLength(5)
+        Input3 = QLineEdit('%f' % (self.PixelSize*1e6))
+        Input3.setMaxLength(self.MaxEditLength)
         Input3.setValidator(QDoubleValidator())
         Input3.textChanged.connect(self.set_pixel_size)
         InputText4 = QLabel('Microscope magnification:')
         Input4 = QLineEdit('%d' % (self.Magnification))
-        Input4.setMaxLength(5)
+        Input4.setMaxLength(self.MaxEditLength)
         Input4.setValidator(QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
         InputText5 = QLabel('Tip-to-Halfpoint Buffer [um]:')
         Input5 = QLineEdit('%d' % (self.Tip2HalfPointBuffer*1e6))
-        Input5.setMaxLength(5)
+        Input5.setMaxLength(self.MaxEditLength)
         Input5.setValidator(QDoubleValidator())
         Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
         
@@ -206,6 +207,12 @@ class MainWindow(QMainWindow):
         
     def drop_new_image(self,s):
         print(s)
+        Image = QLabel()
+        Image.setPixmap(QPixmap(self.ImageFullfile))
+        Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        Image.setAcceptDrops(True)
+        Image.dropEvent = self.drop_new_image
+        Image.mousePressEvent = self.getPos
         
         
     def onLithModeButtonClick(self,s):
@@ -223,32 +230,83 @@ class MainWindow(QMainWindow):
             self.LithModeButton.toggle()
             
     def set_strain_rate(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
         self.StrainRate = float(s)*1e-6
         self.draw_geometry()
         
     def set_pixel_size(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
         self.PixelSize = float(s)*1e-6
         self.draw_geometry()
         
     def set_magnification(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
         self.Magnification = float(s)
         self.draw_geometry()
         
     def set_final_strain(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
         self.FinalStrain = float(s)/100
         self.draw_geometry()
         
     def set_tip_to_halfpoint_buffer(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
         self.Tip2HalfPointBuffer = float(s)*1e-6
         self.draw_geometry
         
     def transform_coordinates_image2rl(self,InPoint):
         
+        # transform InPoint to np array
+        InPoint = np.array(InPoint)
+        
+        self.calculate_transformation_constants()
+        
+        if InPoint.size == 1:
+            OutPoint = InPoint*self.Im2RlScalingFactor
+            return OutPoint
+        
+        # shift InPoint to Origin
+        InPoint = InPoint - self.ImageOrigin
+        # scale InPoint via SizePerPixel
+        OutPoint = InPoint*self.Im2RlScalingFactor + self.RlOrigin
+        
         return OutPoint
         
     def transform_coordinates_rl2image(self,InPoint):
         
+        # transform InPoint to np array
+        InPoint = np.array(InPoint)
+        
+        self.calculate_transformation_constants()
+        
+        if InPoint.size == 1:
+            OutPoint = InPoint*self.Rl2ImScalingFactor
+            return OutPoint
+        
+        # shift InPoint to Origin
+        InPoint = InPoint - self.RlOrigin
+        # scale InPoint via SizePerPixel
+        OutPoint = InPoint*self.Rl2ImScalingFactor + self.ImageOrigin
+        
         return OutPoint
+    
+    def calculate_transformation_constants(self):
+        
+        self.Im2RlScalingFactor = self.PixelSize/self.Magnification
+        self.Rl2ImScalingFactor = 1/self.Im2RlScalingFactor
+        self.RlOrigin = self.StartingTipPosition
+        self.ImageOrigin = np.array(self.Points[2])
+        
             
     def draw_geometry(self):
          Bool = self.check_sufficient_information()
@@ -256,33 +314,68 @@ class MainWindow(QMainWindow):
          if not Bool:
              return
          self.calculate_geometry()
+         #TODO self.clear_painting()
+         #TODO self.paint_experiment()
          
     def calculate_geometry(self):
-        A1 = np.array(self.Points[0])
-        A2 = np.array(self.Points[1])
-        T = np.array(self.Points[2])
         
-        self.InitialTipPosition = 1
-        self.Anchor1 = A1 #Real world position of anchor 1
-        self.Anchor2 = A2 #Real world position of anchor 2
+        self.Anchor1 = self.transform_coordinates_image2rl(np.array(self.Points[0]))
+        self.Anchor2 = self.transform_coordinates_image2rl(np.array(self.Points[1]))
+        
         self.SegmentLength = np.linalg.norm(self.Anchor1-self.Anchor2)
         self.HalfPoint = (self.Anchor1+self.Anchor2)/2
         self.SegmentDirection = (self.Anchor1 - self.Anchor2)/self.SegmentLength
         self.PerpendicularDirection = np.array([-self.SegmentDirection[1],self.SegmentDirection[0]])
+        self.BufferPoint = self.HalfPoint - self.PerpendicularDirection*self.Tip2HalfPointBuffer
+        self.BowDrawingDistance = self.SegmentLength/2*np.sqrt((1+self.FinalStrain)**2 - 1)
+        self.FinalStrainPoint = self.HalfPoint + self.BowDrawingDistance
+        self.TotalMovementTime = (self.BowDrawingDistance + self.Tip2HalfPointBuffer)/self.StrainRate
         
         print('foo')
 
     def check_sufficient_information(self):
-        if len(self.Points)==3 and not self.StrainRate==[] and not self.FinalStrain==[] and not self.Magnification==[] and not self.PixelSize==[]:
+        if len(self.Points)==3 and all([self.StrainRate,self.FinalStrain,self.Magnification,self.PixelSize,self.Tip2HalfPointBuffer]):
             Bool = True
         else:
             Bool = False
         return Bool
     
     def send_instructions_to_jpk(self):
-        print('Anchor1 ' + str(self.Anchor1))
-        print('Anchor2 ' + str(self.Anchor2))
-        print('HalfPoint ' + str(self.HalfPoint))
+        
+        print('-----------------')
+        print('Anchor1 Rl: ' + str(self.Anchor1))
+        print('Anchor2 Rl: ' + str(self.Anchor2))
+        print('Segment Length Rl: ' + str(self.SegmentLength))
+        print('HalfPoint Rl: ' + str(self.HalfPoint))
+        print('Cantilever Tip Rl: ' + str(self.StartingTipPosition))
+        print('Final Position Rl: ' + str(self.FinalStrainPoint))
+        print('Buffer Position Rl: ' + str(self.BufferPoint))
+        print('Bow Drawing Distance Rl: ' + str(self.BowDrawingDistance))
+        print('-----------------')
+        print('Anchor1 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor1)))
+        print('Anchor2 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor2)))
+        print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.SegmentLength)))
+        print('HalfPoint Image: ' + str(self.transform_coordinates_rl2image(self.HalfPoint)))
+        print('Cantilever Tip Image: ' + str(self.transform_coordinates_rl2image(self.StartingTipPosition)))
+        print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.FinalStrainPoint)))
+        print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.BufferPoint)))
+        print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.BowDrawingDistance)))
+        print('-----------------')
+        print('Anchor1 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor1))))
+        print('Anchor2 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor2))))
+        print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.SegmentLength))))
+        print('HalfPoint R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.HalfPoint))))
+        print('Cantilever Tip R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.StartingTipPosition))))
+        print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.FinalStrainPoint))))
+        print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.BufferPoint))))
+        print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.BowDrawingDistance))))
+        print('-----------------')
+        print('Buffer Position: ' + str(self.BufferPoint))
+        print('Final Position: ' + str(self.FinalStrainPoint))
+        print('')
+        print('Projected Movement Time [s]: ' + str(self.TotalMovementTime))
+        print('-----------------')
+        
 
 def main():
     app = QApplication(sys.argv)

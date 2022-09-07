@@ -27,7 +27,7 @@ class Label(QtWidgets.QWidget):
             self.Path = list(np.array((self.lastPoint.x(), self.lastPoint.y() )))
 
     def mouseMoveEvent(self, event):
-        if event.buttons() and QtCore.Qt.LeftButton and self.drawing:
+        if event.buttons() == QtCore.Qt.LeftButton and self.drawing:
             painter = QtGui.QPainter(self.image)
             painter.setPen(QtGui.QPen(QtCore.Qt.red, 1, QtCore.Qt.SolidLine))
             painter.drawLine(self.lastPoint, event.pos())
