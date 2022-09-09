@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         if len(sys.argv)<2:
             self.StartingTipPosition = [1.5e-6, 1e-6]
         else:
-            self.StartingTipPosition = [float(sys.argv[1]) , float(sys.argv[2])]
+            self.StartingTipPosition = np.array([float(sys.argv[1]) , float(sys.argv[2])])
         
         self.PointCounter = 0
         self.Points = list()
@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
         self.ImageDescription = QLabel(self.ImageDescriptionPrompts[self.PointCounter])
         self.ImageDescription.setFont(QFont('Arial',32))
         
-        self.Pixmap = QPixmap('TestImage.tif')
+        self.Pixmap = QPixmap('BSFibril-14.tif')
         Image = QLabel()
         Image.setPixmap(self.Pixmap)
         Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
@@ -272,13 +272,13 @@ class MainWindow(QMainWindow):
         self.calculate_transformation_constants()
         
         if InPoint.size == 1:
-            OutPoint = InPoint*self.Im2RlScalingFactor
+            OutPoint = InPoint*self.Im2RlScalingVector[0]
             return OutPoint
         
         # shift InPoint to Origin
         InPoint = InPoint - self.ImageOrigin
-        # scale InPoint via SizePerPixel
-        OutPoint = InPoint*self.Im2RlScalingFactor + self.RlOrigin
+        # scale InPoint via SizePerPixel, fl
+        OutPoint = InPoint*self.Im2RlScalingVector + self.RlOrigin
         
         return OutPoint
         
@@ -290,20 +290,22 @@ class MainWindow(QMainWindow):
         self.calculate_transformation_constants()
         
         if InPoint.size == 1:
-            OutPoint = InPoint*self.Rl2ImScalingFactor
+            OutPoint = InPoint*self.Rl2ImScalingVector[0]
             return OutPoint
         
         # shift InPoint to Origin
         InPoint = InPoint - self.RlOrigin
+        # flip y axis since pixel numbering for images is reversed in y
+        InPoint[1] = -InPoint[1]
         # scale InPoint via SizePerPixel
-        OutPoint = InPoint*self.Rl2ImScalingFactor + self.ImageOrigin
+        OutPoint = InPoint*self.Rl2ImScalingVector + self.ImageOrigin
         
         return OutPoint
     
     def calculate_transformation_constants(self):
         
-        self.Im2RlScalingFactor = self.PixelSize/self.Magnification
-        self.Rl2ImScalingFactor = 1/self.Im2RlScalingFactor
+        self.Im2RlScalingVector = np.array([1,-1])*self.PixelSize/self.Magnification
+        self.Rl2ImScalingVector = np.array([1,-1])*self.Magnification/self.PixelSize
         self.RlOrigin = self.StartingTipPosition
         self.ImageOrigin = np.array(self.Points[2])
         
