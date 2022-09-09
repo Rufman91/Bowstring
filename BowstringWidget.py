@@ -11,6 +11,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import sys
 import numpy as np
+import sip
+
+
 
 class DrawWidget(QWidget):
     def __init__(self, parent=None):
@@ -80,12 +83,15 @@ class MainWindow(QMainWindow):
     def __init__(self,*args,**kwargs):
         super(MainWindow,self).__init__(*args,**kwargs)
         
+        
         # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY
-        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6
+        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6 ImageFullFile
         if len(sys.argv)<2:
             self.StartingTipPosition = [1.5e-6, 1e-6]
+            self.ImageFullFile = 'TestImage.tif'
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]) , float(sys.argv[2])])
+            self.ImageFullFile = str(sys.argv[3])
         
         self.PointCounter = 0
         self.Points = list()
@@ -124,7 +130,7 @@ class MainWindow(QMainWindow):
         self.ImageDescription = QLabel(self.ImageDescriptionPrompts[self.PointCounter])
         self.ImageDescription.setFont(QFont('Arial',32))
         
-        self.Pixmap = QPixmap('BSFibril-14.tif')
+        self.Pixmap = QPixmap(self.ImageFullFile)
         Image = QLabel()
         Image.setPixmap(self.Pixmap)
         Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
