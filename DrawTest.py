@@ -7,11 +7,12 @@ Created on Wed Mar  3 20:49:34 2021
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
+import time
 
 
-class Label(QtWidgets.QWidget):
+class DrawTool(QtWidgets.QWidget):
     def __init__(self, parent=None):
-        super(Label, self).__init__(parent)
+        super(DrawTool, self).__init__(parent)
         self.image = QtGui.QPixmap("TestImage.tif")
         self.drawing = True
         self.lastPoint = QtCore.QPoint()
@@ -43,20 +44,43 @@ class Label(QtWidgets.QWidget):
 
     def sizeHint(self):
         return self.image.size()
+    
+    def draw_line(self,Point1,Point2):
+        painter = QtGui.QPainter(self.image)
+        painter.setPen(QtGui.QPen(QtCore.Qt.red, 5, QtCore.Qt.SolidLine))
+        painter.drawLine(QtCore.QPoint(Point1[0],Point1[1]),QtCore.QPoint(Point2[0],Point2[1]) )
+        self.update()
 
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow,self).__init__(parent)
 
-        self.label = Label()
+        self.Draw = DrawTool()
         self.textedit = QtWidgets.QTextEdit()
 
         widget = QtWidgets.QWidget()
         self.setCentralWidget(widget)
         lay = QtWidgets.QHBoxLayout(widget)
-        lay.addWidget(self.label, alignment=QtCore.Qt.AlignCenter)
+        lay.addWidget(self.Draw, alignment=QtCore.Qt.AlignCenter)
         lay.addWidget(self.textedit)
+        
+        
+        
+        time.sleep(1)
+        
+        Point1 = np.array([0,0])
+        Point2 = np.array([500,500])
+        
+        self.Draw.draw_line(Point1,Point2)
+        
+        time.sleep(1)
+        
+        Point1 = np.array([0,500])
+        Point2 = np.array([500,0])
+        
+        self.Draw.draw_line(Point1,Point2)
+        
 
 
 

@@ -11,72 +11,28 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import sys
 import numpy as np
-import sip
 
 
 
-class DrawWidget(QWidget):
-    def __init__(self, parent=None):
-        super(DrawWidget, self).__init__(parent)
-        self.image = QPixmap("TestImage.tif")
-        self.drawing = True
-        self.lastPoint = QPoint()
-
-    def paintEvent(self, event):
+class PaintPixmap(QPixmap):
+    def __init__(self, Path):
+        super().__init__(Path)
+        
         painter = QPainter(self)
-        painter.drawPixmap(QPoint(), self.image)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drawing = True
-            self.lastPoint = event.pos()
-            self.Path = list(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() and Qt.LeftButton and self.drawing:
-            painter = QPainter(self.image)
-            painter.setPen(QPen(Qt.red, 1, Qt.SolidLine))
-            painter.drawLine(self.lastPoint, event.pos())
-            self.lastPoint = event.pos()
-            #print(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-            self.Path.append(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        if event.button == Qt.LeftButton:
-            self.drawing = False
-            print(self.Path)
-
-class PointWidget(QWidget):
-    def __init__(self, parent=None):
-        super(DrawWidget, self).__init__(parent)
-        self.image = QPixmap("TestImage.tif")
-        self.lastPoint = QPoint()
-
-    def paintEvent(self, event):
+        painter.setPen(QPen(Qt.black,30,Qt.DashLine))
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.drawEllipse(250,250, 200, 400)
+        painter.end()
+        
+    def paintEvent(self,PointList):
+        
         painter = QPainter(self)
-        painter.drawPixmap(QPoint(), self.image)
+        painter.setPen(QPen(Qt.black,30))
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.drawEllipse(450,250, 200, 400)
+        painter.end()
+        
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drawing = True
-            self.lastPoint = event.pos()
-            self.Path = list(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() and Qt.LeftButton and self.drawing:
-            painter = QPainter(self.image)
-            painter.setPen(QPen(Qt.red, 1, Qt.SolidLine))
-            painter.drawLine(self.lastPoint, event.pos())
-            self.lastPoint = event.pos()
-            #print(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-            self.Path.append(np.array((self.lastPoint.x(), self.lastPoint.y() )))
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        if event.button == Qt.LeftButton:
-            self.drawing = False
-            print(self.Path)
 
 class MainWindow(QMainWindow):
     
@@ -84,14 +40,18 @@ class MainWindow(QMainWindow):
         super(MainWindow,self).__init__(*args,**kwargs)
         
         
-        # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY
-        #                     e.g.: python BowstringWidget.py 1.345e-6 1.0000e-6 ImageFullFile
+        # Run the script like this: python BowstringWidget.py CurrentTipPositionX CurrentTipPositionY ImageFullFile
+        #            e.g. on linux: python BowstringWidget.py 1.345e-6 1.0000e-6 "path/to/image/image.tif"
+        #          e.g. on windows: python BowstringWidget.py 1.345e-6 1.0000e-6 "path\to\image\image.tif"
+        # Note: on linux '' and "" work as string denomiators, in windows its just ""
+        
         if len(sys.argv)<2:
             self.StartingTipPosition = [1.5e-6, 1e-6]
             self.ImageFullFile = 'TestImage.tif'
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]) , float(sys.argv[2])])
             self.ImageFullFile = str(sys.argv[3])
+        
         
         self.PointCounter = 0
         self.Points = list()
@@ -130,13 +90,13 @@ class MainWindow(QMainWindow):
         self.ImageDescription = QLabel(self.ImageDescriptionPrompts[self.PointCounter])
         self.ImageDescription.setFont(QFont('Arial',32))
         
-        self.Pixmap = QPixmap(self.ImageFullFile)
-        Image = QLabel()
-        Image.setPixmap(self.Pixmap)
-        Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        Image.setAcceptDrops(True)
-        Image.dropEvent = self.drop_new_image
-        Image.mousePressEvent = self.getPos
+        self.Pixmap = PaintPixmap(self.ImageFullFile)
+        self.Image = QLabel()
+        self.Image.setPixmap(self.Pixmap)
+        self.Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.Image.setAcceptDrops(True)
+        self.Image.dropEvent = self.drop_new_image
+        self.Image.mousePressEvent = self.getPos
         
         self.MaxEditLength = 10
         
@@ -172,7 +132,7 @@ class MainWindow(QMainWindow):
         Grid = QGridLayout()
         Grid.setSpacing(10)
         Grid.addWidget(self.ImageDescription,0,0)
-        Grid.addWidget(Image,1,0,10,1)
+        Grid.addWidget(self.Image,1,0,10,1)
         Grid.addWidget(InputText1,1,1)
         Grid.addWidget(Input1,1,2)
         Grid.addWidget(InputText2,2,1)
@@ -185,10 +145,10 @@ class MainWindow(QMainWindow):
         Grid.addWidget(Input5,5,2)
         Grid.addWidget(StartButton,6,1,1,2)
         
-        Widget = QWidget()
-        Widget.setLayout(Grid)
+        self.Widget = QWidget()
+        self.Widget.setLayout(Grid)
         
-        self.setCentralWidget(Widget)
+        self.setCentralWidget(self.Widget)
         
         self.setAcceptDrops(True)
         self.setWindowTitle('Bowstring') 
@@ -213,12 +173,12 @@ class MainWindow(QMainWindow):
         
     def drop_new_image(self,s):
         print(s)
-        Image = QLabel()
-        Image.setPixmap(QPixmap(self.ImageFullfile))
-        Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        Image.setAcceptDrops(True)
-        Image.dropEvent = self.drop_new_image
-        Image.mousePressEvent = self.getPos
+        self.Image = QLabel()
+        self.Image.setPixmap(QPixmap(self.self.ImageFullfile))
+        self.Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.Image.setAcceptDrops(True)
+        self.Image.dropEvent = self.drop_new_image
+        self.Image.mousePressEvent = self.getPos
         
         
     def onLithModeButtonClick(self,s):
@@ -268,7 +228,8 @@ class MainWindow(QMainWindow):
             return
         s = s.replace(',','.')
         self.Tip2HalfPointBuffer = float(s)*1e-6
-        self.draw_geometry
+        self.draw_geometry()
+        
         
     def transform_coordinates_image2rl(self,InPoint):
         
@@ -282,9 +243,9 @@ class MainWindow(QMainWindow):
             return OutPoint
         
         # shift InPoint to Origin
-        InPoint = InPoint - self.ImageOrigin
-        # scale InPoint via SizePerPixel, fl
-        OutPoint = InPoint*self.Im2RlScalingVector + self.RlOrigin
+        InPoint = InPoint - self.RlOriginInImage
+        # scale InPoint via SizePerPixel
+        OutPoint = InPoint*self.Im2RlScalingVector
         
         return OutPoint
         
@@ -300,11 +261,9 @@ class MainWindow(QMainWindow):
             return OutPoint
         
         # shift InPoint to Origin
-        InPoint = InPoint - self.RlOrigin
-        # flip y axis since pixel numbering for images is reversed in y
-        InPoint[1] = -InPoint[1]
+        InPoint = InPoint - self.ImageOriginInRl
         # scale InPoint via SizePerPixel
-        OutPoint = InPoint*self.Rl2ImScalingVector + self.ImageOrigin
+        OutPoint = InPoint*self.Rl2ImScalingVector
         
         return OutPoint
     
@@ -312,18 +271,18 @@ class MainWindow(QMainWindow):
         
         self.Im2RlScalingVector = np.array([1,-1])*self.PixelSize/self.Magnification
         self.Rl2ImScalingVector = np.array([1,-1])*self.Magnification/self.PixelSize
-        self.RlOrigin = self.StartingTipPosition
-        self.ImageOrigin = np.array(self.Points[2])
+        self.RlOriginInImage = np.array(self.Points[2]) - self.StartingTipPosition*self.Rl2ImScalingVector
+        self.ImageOriginInRl = self.StartingTipPosition - np.array(self.Points[2])*self.Im2RlScalingVector
+        
         
             
     def draw_geometry(self):
          Bool = self.check_sufficient_information()
-         print(Bool)
+         # print(Bool)
          if not Bool:
              return
          self.calculate_geometry()
-         #TODO self.clear_painting()
-         #TODO self.paint_experiment()
+         self.paint_experiment()
          
     def calculate_geometry(self):
         
@@ -336,10 +295,9 @@ class MainWindow(QMainWindow):
         self.PerpendicularDirection = np.array([-self.SegmentDirection[1],self.SegmentDirection[0]])
         self.BufferPoint = self.HalfPoint - self.PerpendicularDirection*self.Tip2HalfPointBuffer
         self.BowDrawingDistance = self.SegmentLength/2*np.sqrt((1+self.FinalStrain)**2 - 1)
-        self.FinalStrainPoint = self.HalfPoint + self.BowDrawingDistance
+        self.FinalStrainPoint = self.HalfPoint + self.PerpendicularDirection*self.BowDrawingDistance
         self.TotalMovementTime = (self.BowDrawingDistance + self.Tip2HalfPointBuffer)/self.StrainRate
         
-        print('foo')
 
     def check_sufficient_information(self):
         if len(self.Points)==3 and all([self.StrainRate,self.FinalStrain,self.Magnification,self.PixelSize,self.Tip2HalfPointBuffer]):
@@ -347,6 +305,14 @@ class MainWindow(QMainWindow):
         else:
             Bool = False
         return Bool
+    
+    def paint_experiment(self):
+        
+        #TODO define list of points
+        ListOfPoints = [1,1]
+        
+        self.Pixmap.paintEvent(ListOfPoints)
+        self.Image.setPixmap(self.Pixmap)
     
     def send_instructions_to_jpk(self):
         
@@ -384,6 +350,11 @@ class MainWindow(QMainWindow):
         print('Projected Movement Time [s]: ' + str(self.TotalMovementTime))
         print('-----------------')
         
+        
+        print(self.Im2RlScalingVector)
+        print(self.Rl2ImScalingVector)
+        print(self.RlOriginInImage)
+        print(self.ImageOriginInRl)
 
 def main():
     app = QApplication(sys.argv)
