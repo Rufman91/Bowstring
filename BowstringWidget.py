@@ -18,20 +18,46 @@ class PaintPixmap(QPixmap):
     def __init__(self, Path):
         super().__init__(Path)
         
+        
+    def paintEvent(self,PointList,PaintedObject='TestDrawing'):
+        
+        if len(PointList)==0:
+            return
+        
+        Points = []
+        FPoints = []
+        for P in PointList:
+            Points.append(QPoint(int(P[0]),int(P[1])))
+            FPoints.append(QPointF(int(P[0]),int(P[1])))
+        
         painter = QPainter(self)
-        painter.setPen(QPen(Qt.black,30,Qt.DashLine))
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.drawEllipse(250,250, 200, 400)
+        
+        if PaintedObject=='User Points':
+                painter.setPen(QPen(Qt.red,6))
+                painter.setRenderHint(QPainter.Antialiasing)
+                for P in FPoints:
+                    painter.drawPoint(P)
+        elif PaintedObject=='Accessible Area':
+                Rectangle = QRect(Points[0],Points[1])
+                painter.setPen(QPen(Qt.green,4))
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.drawRect(Rectangle)
+        elif PaintedObject=='Bowstring Geometry':
+                painter.setPen(QPen(Qt.green,3))
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.drawLine(FPoints[0], FPoints[1])
+                painter.drawLine(FPoints[0], FPoints[2])
+                painter.drawLine(FPoints[1], FPoints[2])
+                painter.drawLine(FPoints[3], FPoints[2])
+                painter.setPen(QPen(Qt.green,3,Qt.DashLine))
+                painter.drawLine(FPoints[4], FPoints[3])
+        elif PaintedObject=='TestDrawing':
+                painter = QPainter(self)
+                painter.setPen(QPen(Qt.black,30,Qt.DashLine))
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.drawEllipse(450,250, 200, 400)
+        
         painter.end()
-        
-    def paintEvent(self,PointList):
-        
-        painter = QPainter(self)
-        painter.setPen(QPen(Qt.black,30))
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.drawEllipse(450,250, 200, 400)
-        painter.end()
-        
 
 
 class MainWindow(QMainWindow):
@@ -46,7 +72,7 @@ class MainWindow(QMainWindow):
         # Note: on linux '' and "" work as string denomiators, in windows its just ""
         
         if len(sys.argv)<2:
-            self.StartingTipPosition = [1.5e-6, 1e-6]
+            self.StartingTipPosition = [0, 0]
             self.ImageFullFile = 'TestImage.tif'
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]) , float(sys.argv[2])])
@@ -278,9 +304,15 @@ class MainWindow(QMainWindow):
             
     def draw_geometry(self):
          Bool = self.check_sufficient_information()
-         # print(Bool)
+         
+         self.Pixmap = PaintPixmap(self.ImageFullFile)
+         self.Image.setPixmap(self.Pixmap)
+         self.Pixmap.paintEvent(self.Points,'User Points')
+         self.Image.setPixmap(self.Pixmap)
+         
          if not Bool:
              return
+         
          self.calculate_geometry()
          self.paint_experiment()
          
@@ -308,13 +340,37 @@ class MainWindow(QMainWindow):
     
     def paint_experiment(self):
         
+        self.Pixmap = PaintPixmap(self.ImageFullFile)
+        self.Image.setPixmap(self.Pixmap)
+        
         #TODO define list of points
         ListOfPoints = [1,1]
-        
-        self.Pixmap.paintEvent(ListOfPoints)
+        TopLeft = self.transform_coordinates_rl2image([-5e-5, -5e-5])
+        BottomRight = self.transform_coordinates_rl2image([5e-5,5e-5])
+        InPoints1 = [TopLeft, BottomRight]
+        self.Pixmap.paintEvent(InPoints1,'Accessible Area')
+        InPoints2 = [
+            self.transform_coordinates_rl2image(self.Anchor1),
+            self.transform_coordinates_rl2image(self.Anchor2),
+            self.transform_coordinates_rl2image(self.FinalStrainPoint),
+            self.transform_coordinates_rl2image(self.HalfPoint),
+            self.transform_coordinates_rl2image(self.BufferPoint)
+            ]
+        self.Pixmap.paintEvent(InPoints2,'Bowstring Geometry')
+        self.Pixmap.paintEvent(self.Points,'User Points')
         self.Image.setPixmap(self.Pixmap)
     
     def send_instructions_to_jpk(self):
+        
+        Bool = self.check_sufficient_information()
+        
+        if not Bool:
+            print("""\n
+                  --------------------------------------------------------------------------------\n
+                  Insufficient information! Set all points and choose valid experiment parameters.\n
+                  --------------------------------------------------------------------------------\n
+                  """)
+            return
         
         print('-----------------')
         print('Anchor1 Rl: ' + str(self.Anchor1))
