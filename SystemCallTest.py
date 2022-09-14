@@ -8,7 +8,7 @@ Created on Mon Sep 12 14:00:34 2022
 import subprocess
 import time
 
-FUllCommand = """python BowstringWidget.py 1e-6 1.4e-6 "BSFibril-14.tif"
+FUllCommand = """conda run -n PythonStripped python BowstringWidget.py 1e-6 1.4e-6 "BSFibril-14.tif"
 """
 
 MyProcess = subprocess.Popen(FUllCommand, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE, encoding='UTF-8')
