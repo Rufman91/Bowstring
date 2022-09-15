@@ -411,6 +411,8 @@ class MainWindow(QMainWindow):
         print(self.Rl2ImScalingVector)
         print(self.RlOriginInImage)
         print(self.ImageOriginInRl)
+        
+        sys.stdout.flush()
 
 def main():
     app = QApplication(sys.argv)

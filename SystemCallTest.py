@@ -5,23 +5,21 @@ Created on Mon Sep 12 14:00:34 2022
 @author: Manuel Rufin
 """
 
+import os
+import tempfile
 import subprocess
-import time
+import shlex
 
 FUllCommand = """python BowstringWidget.py 1e-6 1.4e-6 "BSFibril-14.tif"
 """
 
-MyProcess = subprocess.Popen(FUllCommand, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE, encoding='UTF-8')
+SplitCommand = shlex.split(FUllCommand)
 
-ReturnCode = None
+#p = subprocess.Popen(FUllCommand, shell=True, stdout = subprocess.PIPE, encoding='UTF-8')
+#p = subprocess.Popen(SplitCommand, shell=False,bufsize=0, stdout  subprocess.PIPE, encoding='UTF-8')
 
-while ReturnCode==None:
-    print('...')
-    time.sleep(1)
-    ReturnCode = MyProcess.poll()
-    
-print(ReturnCode)
-print('STDOUT:')
-print(MyProcess.stdout.read())
-print('STDERR:')
-print(MyProcess.communicate()[1])
+cmd = SplitCommand
+
+with subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=True) as p:
+    for line in p.stdout:
+        print(line, end='')
