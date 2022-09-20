@@ -9,6 +9,7 @@ Created on Wed Mar  3 17:38:41 2021
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+import time
 import sys
 import os
 import numpy as np
@@ -118,6 +119,11 @@ class MainWindow(QMainWindow):
         print(self.ProgramPath)
         print(self.ImagePath)
         
+        self.InstructionStartString = 'InstructionStart'
+        self.InstructionEndString = 'InstructionEnd'
+        
+        self.PositioningVelocity = float(1e-5)
+        
         self.PointCounter = 0
         self.Points = list()
         self.PaHStrainRate = float(2e-6)
@@ -162,65 +168,88 @@ class MainWindow(QMainWindow):
         self.Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         self.Image.mousePressEvent = self.getPos
         
-        self.MaxEditLength = 10
+        
+        self.TitleFontSize = 22
+        
+        Title0 = QLabel('General Settings')
+        Title0.setFont(QFont('Arial',self.TitleFontSize))
+        Title0.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         Title1 = QLabel('Pull and hold')
-        Title1.setFont(QFont('Arial',22))
+        Title1.setFont(QFont('Arial',self.TitleFontSize))
         Title1.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
+        self.MaxEditLength = 10
+        
         InputText1 = QLabel('Choose a strain rate [um/s]:')
-        Input1 = QLineEdit('%d' % (self.PaHStrainRate*1e6))
+        Input1 = QLineEdit('%.2f' % (self.PaHStrainRate*1e6))
         Input1.setMaxLength(self.MaxEditLength)
         Input1.setValidator(QDoubleValidator())
         Input1.textChanged.connect(self.set_strain_rate)
         InputText2 = QLabel('Choose the final strain [%]:')
-        Input2 = QLineEdit('%d' % (self.PaHFinalStrain*100))
+        Input2 = QLineEdit('%.2f' % (self.PaHFinalStrain*100))
         Input2.setMaxLength(self.MaxEditLength)
         Input2.setValidator(QDoubleValidator())
         Input2.textChanged.connect(self.set_final_strain)
         InputText3 = QLabel('Camera Pixel Size [um]:')
-        Input3 = QLineEdit('%f' % (self.PixelSize*1e6))
+        Input3 = QLineEdit('%.3f' % (self.PixelSize*1e6))
         Input3.setMaxLength(self.MaxEditLength)
         Input3.setValidator(QDoubleValidator())
         Input3.textChanged.connect(self.set_pixel_size)
         InputText4 = QLabel('Microscope magnification:')
-        Input4 = QLineEdit('%d' % (self.Magnification))
+        Input4 = QLineEdit('%.1f' % (self.Magnification))
         Input4.setMaxLength(self.MaxEditLength)
         Input4.setValidator(QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
         InputText5 = QLabel('Tip-to-Halfpoint Buffer [um]:')
-        Input5 = QLineEdit('%d' % (self.Tip2HalfPointBuffer*1e6))
+        Input5 = QLineEdit('%.2f' % (self.Tip2HalfPointBuffer*1e6))
         Input5.setMaxLength(self.MaxEditLength)
         Input5.setValidator(QDoubleValidator())
         Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
         InputText6 = QLabel('Holding Time [s]:')
-        Input6 = QLineEdit('%d' % self.PaHHoldingTime)
+        Input6 = QLineEdit('%.2f' % self.PaHHoldingTime)
         Input6.setMaxLength(self.MaxEditLength)
         Input6.setValidator(QDoubleValidator())
         Input6.textChanged.connect(self.set_holding_time)
         
-        self.StartButton = QPushButton('Start Experiment')
-        self.StartButton.mousePressEvent = self.start_experiment
-        self.StartButton.setEnabled(False)
+        InputText7 = QLabel('Positioning Velocity [um/s]:')
+        Input7 = QLineEdit('%.1f' % (self.PositioningVelocity*1e6))
+        Input7.setMaxLength(self.MaxEditLength)
+        Input7.setValidator(QDoubleValidator())
+        Input7.textChanged.connect(self.set_positioning_velocity)
         
+        self.StartPaHButton = QPushButton('Start Experiment')
+        self.StartPaHButton.mousePressEvent = self.send_instructions_pull_and_hold
+        self.StartPaHButton.setEnabled(False)
+        
+        self.StartPaHPCButton = QPushButton('Cycle Positions')
+        self.StartPaHPCButton.mousePressEvent = self.send_instructions_pull_and_hold_position_check
+        self.StartPaHPCButton.setEnabled(False)
+        
+        Spacing = 12
         Grid = QGridLayout()
-        Grid.setSpacing(10)
+        Grid.setSpacing(Spacing)
         Grid.addWidget(self.ImageDescription,0,0)
-        Grid.addWidget(self.Image,1,0,10,1)
-        Grid.addWidget(Title1,1,1,1,2)
-        Grid.addWidget(InputText1,2,1)
-        Grid.addWidget(Input1,2,2)
-        Grid.addWidget(InputText2,3,1)
-        Grid.addWidget(Input2,3,2)
-        Grid.addWidget(InputText3,4,1)
-        Grid.addWidget(Input3,4,2)
-        Grid.addWidget(InputText4,5,1)
-        Grid.addWidget(Input4,5,2)
-        Grid.addWidget(InputText5,6,1)
-        Grid.addWidget(Input5,6,2)
-        Grid.addWidget(InputText6,7,1)
-        Grid.addWidget(Input6,7,2)
-        Grid.addWidget(self.StartButton,8,1,1,2)
+        Grid.addWidget(self.Image,1,0,Spacing,1)
+        
+        Grid.addWidget(Title0,1,1,1,4)
+        Grid.addWidget(InputText7,2,1)
+        Grid.addWidget(Input7,2,2)
+        Grid.addWidget(InputText3,3,1)
+        Grid.addWidget(Input3,3,2)
+        Grid.addWidget(InputText4,4,1)
+        Grid.addWidget(Input4,4,2)
+        Grid.addWidget(Title1,5,1,1,2)
+        Grid.addWidget(InputText1,6,1)
+        Grid.addWidget(Input1,6,2)
+        Grid.addWidget(InputText2,7,1)
+        Grid.addWidget(Input2,7,2)
+        Grid.addWidget(InputText5,8,1)
+        Grid.addWidget(Input5,8,2)
+        Grid.addWidget(InputText6,9,1)
+        Grid.addWidget(Input6,9,2)
+        Grid.addWidget(self.StartPaHPCButton,10,1,1,2)
+        Grid.addWidget(self.StartPaHButton,11,1,1,2)
         
         self.Widget = QWidget()
         self.Widget.setLayout(Grid)
@@ -232,10 +261,6 @@ class MainWindow(QMainWindow):
         self.setGeometry(300, 300, 700, 600) 
         self.show()
         
-    def start_experiment(self,event):
-        print('starting experiment...')
-        self.send_instructions_pull_and_hold()
-
     def getPos(self , event):
         x = event.pos().x()
         y = event.pos().y()
@@ -304,6 +329,13 @@ class MainWindow(QMainWindow):
             return
         s = s.replace(',','.')
         self.PaHHoldingTime = float(s)
+        self.draw_geometry()
+        
+    def set_positioning_velocity(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.PositioningVelocity = float(s)*1e-6
         self.draw_geometry()
         
         
@@ -382,9 +414,11 @@ class MainWindow(QMainWindow):
         
         if all([abs(self.PaHBufferPoint[0])<5e-5,abs(self.PaHBufferPoint[1])<5e-5,
                 abs(self.PaHFinalStrainPoint[0])<5e-5,abs(self.PaHFinalStrainPoint[1])<5e-5]):
-            self.StartButton.setEnabled(True)
+            self.StartPaHButton.setEnabled(True)
+            self.StartPaHPCButton.setEnabled(True)
         else:
-            self.StartButton.setEnabled(False)
+            self.StartPaHButton.setEnabled(False)
+            self.StartPaHPCButton.setEnabled(False)
         
         
 
@@ -393,7 +427,7 @@ class MainWindow(QMainWindow):
             Bool = True
         else:
             Bool = False
-            self.StartButton.setEnabled(False)
+            self.StartPaHButton.setEnabled(False)
         
         return Bool
     
@@ -419,49 +453,94 @@ class MainWindow(QMainWindow):
         self.Pixmap.paintEvent(self.Points,'User Points')
         self.Image.setPixmap(self.Pixmap)
     
-    def send_instructions_pull_and_hold(self):
+    def send_instructions_pull_and_hold(self,event):
         
-        print('-----------------')
-        print('Anchor1 Rl: ' + str(self.Anchor1))
-        print('Anchor2 Rl: ' + str(self.Anchor2))
-        print('Segment Length Rl: ' + str(self.PaHSegmentLength))
-        print('HalfPoint Rl: ' + str(self.HalfPoint))
-        print('Cantilever Tip Rl: ' + str(self.StartingTipPosition))
-        print('Final Position Rl: ' + str(self.PaHFinalStrainPoint))
-        print('Buffer Position Rl: ' + str(self.PaHBufferPoint))
-        print('Bow Drawing Distance Rl: ' + str(self.PaHBowDrawingDistance))
-        print('-----------------')
-        print('Anchor1 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor1)))
-        print('Anchor2 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor2)))
-        print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.PaHSegmentLength)))
-        print('HalfPoint Image: ' + str(self.transform_coordinates_rl2image(self.HalfPoint)))
-        print('Cantilever Tip Image: ' + str(self.transform_coordinates_rl2image(self.StartingTipPosition)))
-        print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint)))
-        print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHBufferPoint)))
-        print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance)))
-        print('-----------------')
-        print('Anchor1 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor1))))
-        print('Anchor2 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor2))))
-        print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHSegmentLength))))
-        print('HalfPoint R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.HalfPoint))))
-        print('Cantilever Tip R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.StartingTipPosition))))
-        print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint))))
-        print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBufferPoint))))
-        print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance))))
-        print('-----------------')
-        print('Buffer Position: ' + str(self.PaHBufferPoint))
-        print('Final Position: ' + str(self.PaHFinalStrainPoint))
-        print('')
-        print('Projected Movement Time [s]: ' + str(self.PaHTotalMovementTime))
-        print('-----------------')
+        # print('-----------------')
+        # print('Anchor1 Rl: ' + str(self.Anchor1))
+        # print('Anchor2 Rl: ' + str(self.Anchor2))
+        # print('Segment Length Rl: ' + str(self.PaHSegmentLength))
+        # print('HalfPoint Rl: ' + str(self.HalfPoint))
+        # print('Cantilever Tip Rl: ' + str(self.StartingTipPosition))
+        # print('Final Position Rl: ' + str(self.PaHFinalStrainPoint))
+        # print('Buffer Position Rl: ' + str(self.PaHBufferPoint))
+        # print('Bow Drawing Distance Rl: ' + str(self.PaHBowDrawingDistance))
+        # print('-----------------')
+        # print('Anchor1 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor1)))
+        # print('Anchor2 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor2)))
+        # print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.PaHSegmentLength)))
+        # print('HalfPoint Image: ' + str(self.transform_coordinates_rl2image(self.HalfPoint)))
+        # print('Cantilever Tip Image: ' + str(self.transform_coordinates_rl2image(self.StartingTipPosition)))
+        # print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint)))
+        # print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHBufferPoint)))
+        # print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance)))
+        # print('-----------------')
+        # print('Anchor1 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor1))))
+        # print('Anchor2 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor2))))
+        # print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHSegmentLength))))
+        # print('HalfPoint R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.HalfPoint))))
+        # print('Cantilever Tip R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.StartingTipPosition))))
+        # print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint))))
+        # print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBufferPoint))))
+        # print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance))))
+        # print('-----------------')
+        # print('Buffer Position: ' + str(self.PaHBufferPoint))
+        # print('Final Position: ' + str(self.PaHFinalStrainPoint))
+        # print('')
+        # print('Projected Movement Time [s]: ' + str(self.PaHTotalMovementTime))
+        # print('-----------------')
+        
+        # print(self.Im2RlScalingVector)
+        # print(self.Rl2ImScalingVector)
+        # print(self.RlOriginInImage)
+        # print(self.ImageOriginInRl)
+        
+        # sys.stdout.flush()
+        
+        InList = [['PullAndHold'],
+                  [str(self.PaHBufferPoint[0]),str(self.PaHBufferPoint[1]),str(self.PositioningVelocity),'0','Retracted'],
+                  [str(self.HalfPoint[0]),str(self.HalfPoint[1]),str(self.PaHStrainRate),'0','Approached'],
+                  [str(self.PaHFinalStrainPoint[0]),str(self.PaHFinalStrainPoint[1]),str(self.PaHStrainRate),str(self.PaHHoldingTime),'Approached'],
+                  [str(self.StartingTipPosition[0]),str(self.StartingTipPosition[1]),str(self.PositioningVelocity),'0','Retracted'],
+                  ]
+        
+        Instructions = self.construct_and_send_instructions(InList)
         
         
-        print(self.Im2RlScalingVector)
-        print(self.Rl2ImScalingVector)
-        print(self.RlOriginInImage)
-        print(self.ImageOriginInRl)
+        
+    def send_instructions_pull_and_hold_position_check(self,event):
+        
+        PositionCheckHoldingTime = '1'
+        
+        InList = [['PullAndHoldPositionCheck'],
+                  [str(self.Anchor1[0]),str(self.Anchor1[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  [str(self.Anchor2[0]),str(self.Anchor2[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  [str(self.PaHBufferPoint[0]),str(self.PaHBufferPoint[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  [str(self.HalfPoint[0]),str(self.HalfPoint[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  [str(self.PaHFinalStrainPoint[0]),str(self.PaHFinalStrainPoint[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  [str(self.StartingTipPosition[0]),str(self.StartingTipPosition[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
+                  ]
+        
+        Instructions = self.construct_and_send_instructions(InList)
+        
+        
+    def construct_and_send_instructions(self,InList):
+        
+        Instructions = [self.InstructionStartString]
+        
+        for S in InList:
+            InstructionLine = ';'.join(S)
+            Instructions.append(InstructionLine)
+        
+        Instructions.append(self.InstructionEndString)
         
         sys.stdout.flush()
+        time.sleep(.1)
+        for S in Instructions:
+            sys.stdout.write(S+'\n')
+        sys.stdout.flush()
+        
+        return Instructions
+    
 
 def main():
     app = QApplication(sys.argv)
