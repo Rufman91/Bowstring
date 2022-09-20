@@ -10,6 +10,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import sys
+import os
 import numpy as np
 
 
@@ -33,23 +34,51 @@ class PaintPixmap(QPixmap):
         painter = QPainter(self)
         
         if PaintedObject=='User Points':
-                painter.setPen(QPen(Qt.red,6))
+                painter.setPen(QPen(Qt.red,3))
                 painter.setRenderHint(QPainter.Antialiasing)
-                for P in FPoints:
-                    painter.drawPoint(P)
+                for p in FPoints:
+                    painter.drawPoint(p)
+                painter.end()
+                painter = QPainter(self)
+                painter.setPen(QPen(Qt.red,3))
+                painter.setRenderHint(QPainter.Antialiasing)
+                for p in FPoints:
+                    Dist = 6
+                    Len = 6
+                    DistLen = Dist+Len
+                    p11 = QPointF(p)
+                    p12 = QPointF(p)
+                    p11.setX(p11.x() - DistLen)
+                    p12.setX(p12.x() - Dist)
+                    p21 = QPointF(p)
+                    p22 = QPointF(p)
+                    p21.setX(p21.x() + DistLen)
+                    p22.setX(p22.x() + Dist)
+                    p31 = QPointF(p)
+                    p32 = QPointF(p)
+                    p31.setY(p31.y() - DistLen)
+                    p32.setY(p32.y() - Dist)
+                    p41 = QPointF(p)
+                    p42 = QPointF(p)
+                    p41.setY(p41.y() + DistLen)
+                    p42.setY(p42.y() + Dist)
+                    painter.drawLine(p11,p12)
+                    painter.drawLine(p21,p22)
+                    painter.drawLine(p31,p32)
+                    painter.drawLine(p41,p42)
         elif PaintedObject=='Accessible Area':
                 Rectangle = QRect(Points[0],Points[1])
-                painter.setPen(QPen(Qt.green,4))
+                painter.setPen(QPen(Qt.cyan,4))
                 painter.setRenderHint(QPainter.Antialiasing)
                 painter.drawRect(Rectangle)
         elif PaintedObject=='Bowstring Geometry':
-                painter.setPen(QPen(Qt.green,3))
+                painter.setPen(QPen(Qt.green,2))
                 painter.setRenderHint(QPainter.Antialiasing)
                 painter.drawLine(FPoints[0], FPoints[1])
                 painter.drawLine(FPoints[0], FPoints[2])
                 painter.drawLine(FPoints[1], FPoints[2])
                 painter.drawLine(FPoints[3], FPoints[2])
-                painter.setPen(QPen(Qt.green,3,Qt.DashLine))
+                painter.setPen(QPen(Qt.green,1,Qt.DashLine))
                 painter.drawLine(FPoints[4], FPoints[3])
         elif PaintedObject=='TestDrawing':
                 painter = QPainter(self)
@@ -71,27 +100,38 @@ class MainWindow(QMainWindow):
         #          e.g. on windows: python BowstringWidget.py 1.345e-6 1.0000e-6 "path\to\image\image.tif"
         # Note: on linux '' and "" work as string denomiators, in windows its just ""
         
+        
+        FullPath = os.path.abspath(str(sys.argv[0]))
+        self.ProgramPath = os.path.dirname(FullPath)
+        
         if len(sys.argv)<2:
             self.StartingTipPosition = [0, 0]
-            self.ImageFullFile = 'TestImage.tif'
+            self.ImageFullFile = os.path.join(self.ProgramPath,'TestImage.tif')
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]) , float(sys.argv[2])])
             self.ImageFullFile = str(sys.argv[3])
         
         
+        self.ImageFullFile = os.path.abspath(self.ImageFullFile)
+        self.ImagePath = os.path.dirname(self.ImageFullFile)
+        
+        print(self.ProgramPath)
+        print(self.ImagePath)
+        
         self.PointCounter = 0
         self.Points = list()
-        self.StrainRate = float(2e-6)
-        self.FinalStrain = float(.2)
+        self.PaHStrainRate = float(2e-6)
+        self.PaHFinalStrain = float(.2)
         self.PixelSize = float(4.65e-6)
         self.Magnification = float(10)
-        self.Tip2HalfPointBuffer = float(5e-6)
+        self.Tip2HalfPointBuffer = float(1e-5)
+        self.PaHHoldingTime = 0
         
         toolbar = QToolBar('My main toolbar')
         toolbar.setIconSize(QSize(64,64))
         self.addToolBar(toolbar)
         
-        self.BowModeButton = QAction(QIcon('icons/Bow.jpg'),"Bowstring mode", self)
+        self.BowModeButton = QAction(QIcon(os.path.join(self.ProgramPath,'icons/Bow.jpg')),"Bowstring mode", self)
         self.BowModeButton.setStatusTip("Design and run a Bowstring experiment")
         self.BowModeButton.triggered.connect(self.onBowModeButtonClick)
         self.BowModeButton.setCheckable(True)
@@ -100,7 +140,7 @@ class MainWindow(QMainWindow):
         
         toolbar.addSeparator()
 
-        self.LithModeButton = QAction(QIcon("icons/Chisel.png"), "Nanolithography mode", self)
+        self.LithModeButton = QAction(QIcon(os.path.join(self.ProgramPath,"icons/Chisel.png")), "Nanolithography mode", self)
         self.LithModeButton.setStatusTip("This is just a placeholder for Nanolithography mode")
         self.LithModeButton.triggered.connect(self.onLithModeButtonClick)
         self.LithModeButton.setCheckable(True)
@@ -120,19 +160,21 @@ class MainWindow(QMainWindow):
         self.Image = QLabel()
         self.Image.setPixmap(self.Pixmap)
         self.Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.Image.setAcceptDrops(True)
-        self.Image.dropEvent = self.drop_new_image
         self.Image.mousePressEvent = self.getPos
         
         self.MaxEditLength = 10
         
+        Title1 = QLabel('Pull and hold')
+        Title1.setFont(QFont('Arial',22))
+        Title1.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
         InputText1 = QLabel('Choose a strain rate [um/s]:')
-        Input1 = QLineEdit('%d' % (self.StrainRate*1e6))
+        Input1 = QLineEdit('%d' % (self.PaHStrainRate*1e6))
         Input1.setMaxLength(self.MaxEditLength)
         Input1.setValidator(QDoubleValidator())
         Input1.textChanged.connect(self.set_strain_rate)
         InputText2 = QLabel('Choose the final strain [%]:')
-        Input2 = QLineEdit('%d' % (self.FinalStrain*100))
+        Input2 = QLineEdit('%d' % (self.PaHFinalStrain*100))
         Input2.setMaxLength(self.MaxEditLength)
         Input2.setValidator(QDoubleValidator())
         Input2.textChanged.connect(self.set_final_strain)
@@ -151,25 +193,34 @@ class MainWindow(QMainWindow):
         Input5.setMaxLength(self.MaxEditLength)
         Input5.setValidator(QDoubleValidator())
         Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
+        InputText6 = QLabel('Holding Time [s]:')
+        Input6 = QLineEdit('%d' % self.PaHHoldingTime)
+        Input6.setMaxLength(self.MaxEditLength)
+        Input6.setValidator(QDoubleValidator())
+        Input6.textChanged.connect(self.set_holding_time)
         
-        StartButton = QPushButton('Start Experiment')
-        StartButton.mousePressEvent = self.start_experiment
+        self.StartButton = QPushButton('Start Experiment')
+        self.StartButton.mousePressEvent = self.start_experiment
+        self.StartButton.setEnabled(False)
         
         Grid = QGridLayout()
         Grid.setSpacing(10)
         Grid.addWidget(self.ImageDescription,0,0)
         Grid.addWidget(self.Image,1,0,10,1)
-        Grid.addWidget(InputText1,1,1)
-        Grid.addWidget(Input1,1,2)
-        Grid.addWidget(InputText2,2,1)
-        Grid.addWidget(Input2,2,2)
-        Grid.addWidget(InputText3,3,1)
-        Grid.addWidget(Input3,3,2)
-        Grid.addWidget(InputText4,4,1)
-        Grid.addWidget(Input4,4,2)
-        Grid.addWidget(InputText5,5,1)
-        Grid.addWidget(Input5,5,2)
-        Grid.addWidget(StartButton,6,1,1,2)
+        Grid.addWidget(Title1,1,1,1,2)
+        Grid.addWidget(InputText1,2,1)
+        Grid.addWidget(Input1,2,2)
+        Grid.addWidget(InputText2,3,1)
+        Grid.addWidget(Input2,3,2)
+        Grid.addWidget(InputText3,4,1)
+        Grid.addWidget(Input3,4,2)
+        Grid.addWidget(InputText4,5,1)
+        Grid.addWidget(Input4,5,2)
+        Grid.addWidget(InputText5,6,1)
+        Grid.addWidget(Input5,6,2)
+        Grid.addWidget(InputText6,7,1)
+        Grid.addWidget(Input6,7,2)
+        Grid.addWidget(self.StartButton,8,1,1,2)
         
         self.Widget = QWidget()
         self.Widget.setLayout(Grid)
@@ -183,7 +234,7 @@ class MainWindow(QMainWindow):
         
     def start_experiment(self,event):
         print('starting experiment...')
-        self.send_instructions_to_jpk()
+        self.send_instructions_pull_and_hold()
 
     def getPos(self , event):
         x = event.pos().x()
@@ -196,15 +247,6 @@ class MainWindow(QMainWindow):
         self.ImageDescription.setText(self.ImageDescriptionPrompts[self.PointCounter])
         print(self.Points)
         self.draw_geometry()
-        
-    def drop_new_image(self,s):
-        print(s)
-        self.Image = QLabel()
-        self.Image.setPixmap(QPixmap(self.self.ImageFullfile))
-        self.Image.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.Image.setAcceptDrops(True)
-        self.Image.dropEvent = self.drop_new_image
-        self.Image.mousePressEvent = self.getPos
         
         
     def onLithModeButtonClick(self,s):
@@ -225,7 +267,7 @@ class MainWindow(QMainWindow):
         if not s:
             return
         s = s.replace(',','.')
-        self.StrainRate = float(s)*1e-6
+        self.PaHStrainRate = float(s)*1e-6
         self.draw_geometry()
         
     def set_pixel_size(self,s):
@@ -246,7 +288,7 @@ class MainWindow(QMainWindow):
         if not s:
             return
         s = s.replace(',','.')
-        self.FinalStrain = float(s)/100
+        self.PaHFinalStrain = float(s)/100
         self.draw_geometry()
         
     def set_tip_to_halfpoint_buffer(self,s):
@@ -254,6 +296,14 @@ class MainWindow(QMainWindow):
             return
         s = s.replace(',','.')
         self.Tip2HalfPointBuffer = float(s)*1e-6
+        self.draw_geometry()
+        
+    def set_holding_time(self,s):
+        if not s or s=='':
+            self.set_holding_time('0')
+            return
+        s = s.replace(',','.')
+        self.PaHHoldingTime = float(s)
         self.draw_geometry()
         
         
@@ -321,21 +371,30 @@ class MainWindow(QMainWindow):
         self.Anchor1 = self.transform_coordinates_image2rl(np.array(self.Points[0]))
         self.Anchor2 = self.transform_coordinates_image2rl(np.array(self.Points[1]))
         
-        self.SegmentLength = np.linalg.norm(self.Anchor1-self.Anchor2)
+        self.PaHSegmentLength = np.linalg.norm(self.Anchor1-self.Anchor2)
         self.HalfPoint = (self.Anchor1+self.Anchor2)/2
-        self.SegmentDirection = (self.Anchor1 - self.Anchor2)/self.SegmentLength
+        self.SegmentDirection = (self.Anchor1 - self.Anchor2)/self.PaHSegmentLength
         self.PerpendicularDirection = np.array([-self.SegmentDirection[1],self.SegmentDirection[0]])
-        self.BufferPoint = self.HalfPoint - self.PerpendicularDirection*self.Tip2HalfPointBuffer
-        self.BowDrawingDistance = self.SegmentLength/2*np.sqrt((1+self.FinalStrain)**2 - 1)
-        self.FinalStrainPoint = self.HalfPoint + self.PerpendicularDirection*self.BowDrawingDistance
-        self.TotalMovementTime = (self.BowDrawingDistance + self.Tip2HalfPointBuffer)/self.StrainRate
+        self.PaHBufferPoint = self.HalfPoint - self.PerpendicularDirection*self.Tip2HalfPointBuffer
+        self.PaHBowDrawingDistance = self.PaHSegmentLength/2*np.sqrt((1+self.PaHFinalStrain)**2 - 1)
+        self.PaHFinalStrainPoint = self.HalfPoint + self.PerpendicularDirection*self.PaHBowDrawingDistance
+        self.PaHTotalMovementTime = (self.PaHBowDrawingDistance + self.Tip2HalfPointBuffer)/self.PaHStrainRate
+        
+        if all([abs(self.PaHBufferPoint[0])<5e-5,abs(self.PaHBufferPoint[1])<5e-5,
+                abs(self.PaHFinalStrainPoint[0])<5e-5,abs(self.PaHFinalStrainPoint[1])<5e-5]):
+            self.StartButton.setEnabled(True)
+        else:
+            self.StartButton.setEnabled(False)
+        
         
 
     def check_sufficient_information(self):
-        if len(self.Points)==3 and all([self.StrainRate,self.FinalStrain,self.Magnification,self.PixelSize,self.Tip2HalfPointBuffer]):
+        if len(self.Points)==3 and all([self.PaHStrainRate,self.PaHFinalStrain,self.Magnification,self.PixelSize,self.Tip2HalfPointBuffer]):
             Bool = True
         else:
             Bool = False
+            self.StartButton.setEnabled(False)
+        
         return Bool
     
     def paint_experiment(self):
@@ -352,58 +411,48 @@ class MainWindow(QMainWindow):
         InPoints2 = [
             self.transform_coordinates_rl2image(self.Anchor1),
             self.transform_coordinates_rl2image(self.Anchor2),
-            self.transform_coordinates_rl2image(self.FinalStrainPoint),
+            self.transform_coordinates_rl2image(self.PaHFinalStrainPoint),
             self.transform_coordinates_rl2image(self.HalfPoint),
-            self.transform_coordinates_rl2image(self.BufferPoint)
+            self.transform_coordinates_rl2image(self.PaHBufferPoint)
             ]
         self.Pixmap.paintEvent(InPoints2,'Bowstring Geometry')
         self.Pixmap.paintEvent(self.Points,'User Points')
         self.Image.setPixmap(self.Pixmap)
     
-    def send_instructions_to_jpk(self):
-        
-        Bool = self.check_sufficient_information()
-        
-        if not Bool:
-            print("""\n
-                  --------------------------------------------------------------------------------\n
-                  Insufficient information! Set all points and choose valid experiment parameters.\n
-                  --------------------------------------------------------------------------------\n
-                  """)
-            return
+    def send_instructions_pull_and_hold(self):
         
         print('-----------------')
         print('Anchor1 Rl: ' + str(self.Anchor1))
         print('Anchor2 Rl: ' + str(self.Anchor2))
-        print('Segment Length Rl: ' + str(self.SegmentLength))
+        print('Segment Length Rl: ' + str(self.PaHSegmentLength))
         print('HalfPoint Rl: ' + str(self.HalfPoint))
         print('Cantilever Tip Rl: ' + str(self.StartingTipPosition))
-        print('Final Position Rl: ' + str(self.FinalStrainPoint))
-        print('Buffer Position Rl: ' + str(self.BufferPoint))
-        print('Bow Drawing Distance Rl: ' + str(self.BowDrawingDistance))
+        print('Final Position Rl: ' + str(self.PaHFinalStrainPoint))
+        print('Buffer Position Rl: ' + str(self.PaHBufferPoint))
+        print('Bow Drawing Distance Rl: ' + str(self.PaHBowDrawingDistance))
         print('-----------------')
         print('Anchor1 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor1)))
         print('Anchor2 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor2)))
-        print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.SegmentLength)))
+        print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.PaHSegmentLength)))
         print('HalfPoint Image: ' + str(self.transform_coordinates_rl2image(self.HalfPoint)))
         print('Cantilever Tip Image: ' + str(self.transform_coordinates_rl2image(self.StartingTipPosition)))
-        print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.FinalStrainPoint)))
-        print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.BufferPoint)))
-        print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.BowDrawingDistance)))
+        print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint)))
+        print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHBufferPoint)))
+        print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance)))
         print('-----------------')
         print('Anchor1 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor1))))
         print('Anchor2 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor2))))
-        print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.SegmentLength))))
+        print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHSegmentLength))))
         print('HalfPoint R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.HalfPoint))))
         print('Cantilever Tip R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.StartingTipPosition))))
-        print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.FinalStrainPoint))))
-        print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.BufferPoint))))
-        print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.BowDrawingDistance))))
+        print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint))))
+        print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBufferPoint))))
+        print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance))))
         print('-----------------')
-        print('Buffer Position: ' + str(self.BufferPoint))
-        print('Final Position: ' + str(self.FinalStrainPoint))
+        print('Buffer Position: ' + str(self.PaHBufferPoint))
+        print('Final Position: ' + str(self.PaHFinalStrainPoint))
         print('')
-        print('Projected Movement Time [s]: ' + str(self.TotalMovementTime))
+        print('Projected Movement Time [s]: ' + str(self.PaHTotalMovementTime))
         print('-----------------')
         
         
