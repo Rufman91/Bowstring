@@ -1,0 +1,2 @@
+pyinstaller BowstringWidget.py --distpath ~/jpkdata/Jaritz_Simon_AFM/BowstringApp/dist --workpath ~/jpkdata/Jaritz_Simon_AFM/BowstringApp/build --add-data "/home/jpkuser/Documents/GitHub/Bowstring/TestImage.tif:." --add-data "/home/jpkuser/Documents/GitHub/Bowstring/icons/:./icons"
+
