@@ -91,10 +91,10 @@ with subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=
             Instructions = ['InstructionStart']
         elif line=='InstructionEnd\n' and Instructions[0]=='InstructionStart':
             Instructions.append(line[0:-1])
-            # psProcess.suspend()
+            psProcess.suspend()
             BlockNewInstructions = True
             parse_and_execute_instructions(Instructions)
-            # psProcess.resume()
+            psProcess.resume()
             Instructions = ['Waiting']
         elif Instructions[0]=='Waiting':
             print('Waiting...')

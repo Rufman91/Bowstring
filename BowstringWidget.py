@@ -534,7 +534,28 @@ class MainWindow(QMainWindow):
         time.sleep(.1)
         for S in Instructions:
             sys.stdout.write(S+'\n')
+        
+        #TODO: This does not work as of now!!! Can chain multiple instructions being sent to jpk
+        
+        Btn1 = self.StartPaHButton.isEnabled()
+        Btn2 = self.StartPaHPCButton.isEnabled()
+        
+        self.StartPaHButton.setEnabled(False)
+        self.StartPaHPCButton.setEnabled(False)
+        
+        #freeze the main window so no new instructions can be sent
+        ModalDlg = QDialog(self)
+        ModalDlg.setWindowTitle('Executing instructions...')
+        ModalDlg.setModal(True)
+        ModalDlg.show()
+        
         sys.stdout.flush()
+        time.sleep(2)
+        
+        ModalDlg.reject()
+        
+        self.StartPaHButton.setEnabled(Btn1)
+        self.StartPaHPCButton.setEnabled(Btn2)
         
         return Instructions
     
