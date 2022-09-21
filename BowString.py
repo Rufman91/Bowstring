@@ -8,6 +8,11 @@ from com.jpk.inst.lib import JPKScript
 from com.jpk.util import XYPosition
 from com.jpk.util.jyswingutils import callSwing
 import httplib
+import os
+import time
+import subprocess
+import shlex
+import psutil
 
 
 class CurrentXYScannerControl:
@@ -54,21 +59,22 @@ class CurrentXYScannerControl:
         else:
             return self.getMaxScanRectangle().contains(x, y)
 
-def hover_over_all_key_points(ScannerInstance,TTLInstance,
-A1X,A1Y,A2X,A2Y,ITX,ITY,HPX,HPY,BPX,BPY,FPX,FPY,
-Speed = 10e-6,WaitTime = 2,RecordRealTime = True,
-RecordVideo = False,NthKeyFrame = 2):
+
+def execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame):
     
+    #take the image that is then sent to the widget
+    #TODO
     # make sure piezo is retracted and get current position
     Scanner.retractPiezo()
+    PiezoEngaged = False
     #CurPos = ScannerInstance.getCurrentPosition().get_translated(0,0)
-
-    if RecordRealTime:
-        RealTimeScan.setFilenameRoot('Key-Point-Hoover')
+    
+    if RecordRealTimeScan:
+        RealTimeScan.setFilenameRoot(Mode)
         RealTimeScan.setAutosave(True)
         RealTimeScan.startScanning()
     if RecordVideo:
-        Snapshooter.startImageSequenceSaving('jpg', NthKeyFrame, 'Key-Point-Hoover')
+        Snapshooter.startImageSequenceSaving('jpg', RecordVideoNthFrame, Mode)
         
     # Go though the points with Speed and print the points name
     # each time the position is reached. Then wait for WaitTime
@@ -76,83 +82,71 @@ RecordVideo = False,NthKeyFrame = 2):
     # TTL pulse. If the point is out of the scan range of the 
     # X-Y-Scanner inform the user and move on to the next point.
     
-    # Initial Tip Position
-    if abs(ITX) >= 5e-5 or abs(ITY) >= 5e-5:
-        print('Initial Tip Position exceeds scanner range. Skipping to next point')
-    else:
+    for P in Points:
+        if P[3]=='Approached' and not PiezoEngaged:
+            Scanner.approach()
+            PiezoEngaged = True
+        elif P[3]=='Retracted' and PiezoEngaged:
+            Scanner.retractPiezo()
+            PiezoEngaged = False
         TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(ITX,ITY,Speed)
-        print('Initial Tip Position')
-        time.sleep(WaitTime)
-    # Anchor 1
-    if abs(A1X) >= 5e-5 or abs(A1Y) >= 5e-5:
-        print('Anchor 1 Position exceeds scanner range. Skipping to next point')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(A1X,A1Y,Speed)
-        print('Anchor 1')
-        time.sleep(WaitTime)
-    # Anchor 2
-    if abs(A2X) >= 5e-5 or abs(A2Y) >= 5e-5:
-        print('Anchor 2 Position exceeds scanner range. Skipping to next point')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(A2X,A2Y,Speed)
-        print('Anchor 2')
-        time.sleep(WaitTime)
-    # Buffer Position
-    if abs(BPX) >= 5e-5 or abs(BPY) >= 5e-5:
-        print('Buffer Position exceeds scanner range. Skipping to next point')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(BPX,BPY,Speed)
-        print('Buffer Position')
-        time.sleep(WaitTime)
-    # Segment Half Point
-    if abs(HPX) >= 5e-5 or abs(HPY) >= 5e-5:
-        print('Segment Half Point Position exceeds scanner range. Skipping to next point')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(HPX,HPY,Speed)
-        print('Segment Half Point')
-        time.sleep(WaitTime)
-    # Final Position
-    if abs(FPX) >= 5e-5 or abs(FPY) >= 5e-5:
-        print('Final Position exceeds scanner range. Skipping to next point')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(FPX,FPY,Speed)
-        print('Final Position')
-        time.sleep(WaitTime)
-
-    # Back to initial position
-    # Initial Tip Position
-    if abs(ITX) >= 5e-5 or abs(ITY) >= 5e-5:
-        print('Initial Tip Position exceeds scanner range. Returning to were prgram started')
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(CurPos,Speed)
-        print('Program starting Position')
-    else:
-        TTLInstance.trigger_pulse()
-        xyScanner.moveToXYPosition(ITX,ITY,Speed)
-        print('Initial Tip Position')
+        xyScanner.moveToXYPosition(P[0],P[1],P[2])
+        if P[3]>0:
+            time.sleep(P[3])
     
-
     # Stop recordings
-    if RecordRealTime:
+    if RecordRealTimeScan:
         RealTimeScan.stopScanning()
     if RecordVideo:
         Snapshooter.stopImageSequenceSaving()
     
-    
 
+def parse_and_execute_instructions(InList,TTLInstance):
     
+    SplitList = []
+    for S in InList:
+        SplitList.append(S.split(';'))
+    
+    print(InList)
+    print(SplitList)
+    
+    StartStringCounter = 0
+    EndStringCounter = 0
+    for S in SplitList:
+        if S[0]=='InstructionStart':
+            StartStringCounter += 1
+        elif S[0]=='InstructionEnd':
+            EndStringCounter +=1
+    if not (StartStringCounter==1 and EndStringCounter==1):
+            print('Error: Instructions are faulty!')
+            return
+    SplitList.pop(0)
+    SplitList.pop(-1)
+    ModeSettings = SplitList.pop(0)
+    print(ModeSettings)
+    Mode = ModeSettings[0]
+    RecordRealTimeScan = bool(ModeSettings[1])
+    RecordVideo = bool(ModeSettings[2])
+    RecordVideoNthFrame = int(ModeSettings[3])
+    
+    Points = []
+    for S in SplitList:
+        P = [float(S[0]) , float(S[1]) , float(S[2]) , float(S[3]) , S[4]]
+        Points.append(P)
+    
+    if Mode=='PullAndHold':
+        execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame)
+    elif Mode=='PullAndHoldPositionCheck':
+        execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame)
+    else:
+        print('%s is not an available Bowstring-mode' % Mode)
+    return
 
 #################### Execution #############################
 
 # Set the scanner
 xyScanner = CurrentXYScannerControl()
-print xyScanner.getCurrentPosition()
+print(xyScanner.getCurrentPosition())
 #quit('Just need current position')
 #xyScanner.moveToXYPosition(0,0)
 
@@ -161,42 +155,38 @@ output = TTLOutput.outputs['Pin 4']
 output.style = 'PULSE'
 output.pulse_time = 0.05
 
-#TODO: send current pos and ccd image to other pc with httplib
-# determine geometry and target position there and send back
-# Speeds
-AuxSpeed = 10e-6
-MeasurementSpeed = 2e-6
-# Initial Positions
-Anchor1X = -3.61986495e-5
-Anchor1Y = -3.77713914e-5
-Anchor2X = -5.04364951e-6
-Anchor2Y = 3.89536086e-5
-InitialTipX = -4.4103649513738645e-5
-InitialTipY = 3.523360862260744e-5
-HalfPointX = -2.06211495e-5
-HalfPointY = 5.91108623e-7
+FullCommand = """python BowstringWidget.py 1e-6 1.4e-6 "BSFibril-14.tif"
+"""
 
-BufferPosX = -2.52537883e-5
-BufferPosY = 2.47224073e-6
-FinalPosX = 6.84354713e-6
-FinalPosY = 2.80558053e-5
+SplitCommand = shlex.split(FullCommand)
+
+#p = subprocess.Popen(FullCommand, shell=True, stdout = subprocess.PIPE, encoding='UTF-8')
+#p = subprocess.Popen(SplitCommand, shell=False,bufsize=0, stdout  subprocess.PIPE, encoding='UTF-8')
+
+cmd = SplitCommand
+
+
+with subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=True) as p:
+    Instructions=['Waiting']
+    psProcess = psutil.Process(pid=p.pid)
+    for line in p.stdout:
+        if line=='InstructionStart\n':
+            Instructions = ['InstructionStart']
+        elif line=='InstructionEnd\n' and Instructions[0]=='InstructionStart':
+            Instructions.append(line[0:-1])
+            # psProcess.suspend()
+            BlockNewInstructions = True
+            parse_and_execute_instructions(Instructions)
+            # psProcess.resume()
+            Instructions = ['Waiting']
+        elif Instructions[0]=='Waiting':
+            print('Waiting...')
+            continue
+        else:
+            Instructions.append(line[0:-1])
+        # print(Instructions)
+        # print(line)
 
 # run the desired program here
-
-hover_over_all_key_points(
-xyScanner,output,
-Anchor1X,Anchor1Y,
-Anchor2X,Anchor2Y,
-InitialTipX,InitialTipY,
-HalfPointX,HalfPointY,
-BufferPosX,BufferPosY,
-FinalPosX,FinalPosY,
-20e-6,1,False,
-False,1)
-
-#xyScanner.moveToXYPosition(0,0,AuxSpeed)
-#xyScanner.moveToXYPosition(-3.61986495e-5,-3.77713914e-5,AuxSpeed)
-#xyScanner.moveToXYPosition(-5.04364951e-6,3.89536086e-5,AuxSpeed)
-#xyScanner.moveToXYPosition(0,0,AuxSpeed)
 
 print('Program ended successfully')

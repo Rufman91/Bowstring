@@ -116,13 +116,16 @@ class MainWindow(QMainWindow):
         self.ImageFullFile = os.path.abspath(self.ImageFullFile)
         self.ImagePath = os.path.dirname(self.ImageFullFile)
         
-        print(self.ProgramPath)
-        print(self.ImagePath)
-        
         self.InstructionStartString = 'InstructionStart'
         self.InstructionEndString = 'InstructionEnd'
         
+        self.UpperPiezoRange = 4.999e-5
+        self.LowerPiezoRange = -4.999e-5
+        
         self.PositioningVelocity = float(1e-5)
+        self.RecordVideo = False
+        self.RecordVideoNthFrame = 5
+        self.RecordRealTimeScan = True
         
         self.PointCounter = 0
         self.Points = list()
@@ -217,6 +220,18 @@ class MainWindow(QMainWindow):
         Input7.setMaxLength(self.MaxEditLength)
         Input7.setValidator(QDoubleValidator())
         Input7.textChanged.connect(self.set_positioning_velocity)
+        Input8 = QCheckBox('Record Real Time Scan:')
+        Input8.setChecked(self.RecordRealTimeScan)
+        Input8.stateChanged.connect(self.set_record_real_time_scan)
+        Input9 = QCheckBox('Record Real Time Video:')
+        Input9.setChecked(self.RecordVideo)
+        Input9.stateChanged.connect(self.set_record_video)
+        InputText10 = QLabel('Record every Nth frame: N =')
+        Input10 = QLineEdit('%d' % self.RecordVideoNthFrame)
+        Input10.setMaxLength(4)
+        Input10.setValidator(QIntValidator())
+        Input10.textChanged.connect(self.set_record_video_nth_frame)
+        
         
         self.StartPaHButton = QPushButton('Start Experiment')
         self.StartPaHButton.mousePressEvent = self.send_instructions_pull_and_hold
@@ -226,7 +241,7 @@ class MainWindow(QMainWindow):
         self.StartPaHPCButton.mousePressEvent = self.send_instructions_pull_and_hold_position_check
         self.StartPaHPCButton.setEnabled(False)
         
-        Spacing = 12
+        Spacing = 14
         Grid = QGridLayout()
         Grid.setSpacing(Spacing)
         Grid.addWidget(self.ImageDescription,0,0)
@@ -239,17 +254,22 @@ class MainWindow(QMainWindow):
         Grid.addWidget(Input3,3,2)
         Grid.addWidget(InputText4,4,1)
         Grid.addWidget(Input4,4,2)
-        Grid.addWidget(Title1,5,1,1,2)
-        Grid.addWidget(InputText1,6,1)
-        Grid.addWidget(Input1,6,2)
-        Grid.addWidget(InputText2,7,1)
-        Grid.addWidget(Input2,7,2)
-        Grid.addWidget(InputText5,8,1)
-        Grid.addWidget(Input5,8,2)
-        Grid.addWidget(InputText6,9,1)
-        Grid.addWidget(Input6,9,2)
-        Grid.addWidget(self.StartPaHPCButton,10,1,1,2)
-        Grid.addWidget(self.StartPaHButton,11,1,1,2)
+        Grid.addWidget(Input8,5,1,1,2)
+        Grid.addWidget(Input9,6,1,1,2)
+        Grid.addWidget(InputText10,7,1)
+        Grid.addWidget(Input10,7,2)
+        
+        Grid.addWidget(Title1,8,1,1,2)
+        Grid.addWidget(InputText1,9,1)
+        Grid.addWidget(Input1,9,2)
+        Grid.addWidget(InputText2,10,1)
+        Grid.addWidget(Input2,10,2)
+        Grid.addWidget(InputText5,11,1)
+        Grid.addWidget(Input5,11,2)
+        Grid.addWidget(InputText6,12,1)
+        Grid.addWidget(Input6,12,2)
+        Grid.addWidget(self.StartPaHPCButton,13,1,1,2)
+        Grid.addWidget(self.StartPaHButton,14,1,1,2)
         
         self.Widget = QWidget()
         self.Widget.setLayout(Grid)
@@ -270,7 +290,6 @@ class MainWindow(QMainWindow):
             self.Points = list()
         self.PointCounter += 1
         self.ImageDescription.setText(self.ImageDescriptionPrompts[self.PointCounter])
-        print(self.Points)
         self.draw_geometry()
         
         
@@ -338,7 +357,17 @@ class MainWindow(QMainWindow):
         self.PositioningVelocity = float(s)*1e-6
         self.draw_geometry()
         
+    def set_record_video_nth_frame(self,s):
+        if not s:
+            return
+        self.RecordVideoNthFrame = int(s)
         
+    def set_record_real_time_scan(self,s):
+        self.RecordRealTimeScan = bool(s)
+        
+    def set_record_video(self,s):
+        self.RecordVideo = bool(s)
+    
     def transform_coordinates_image2rl(self,InPoint):
         
         # transform InPoint to np array
@@ -438,8 +467,8 @@ class MainWindow(QMainWindow):
         
         #TODO define list of points
         ListOfPoints = [1,1]
-        TopLeft = self.transform_coordinates_rl2image([-5e-5, -5e-5])
-        BottomRight = self.transform_coordinates_rl2image([5e-5,5e-5])
+        TopLeft = self.transform_coordinates_rl2image([self.LowerPiezoRange, self.LowerPiezoRange])
+        BottomRight = self.transform_coordinates_rl2image([self.UpperPiezoRange,self.UpperPiezoRange])
         InPoints1 = [TopLeft, BottomRight]
         self.Pixmap.paintEvent(InPoints1,'Accessible Area')
         InPoints2 = [
@@ -455,48 +484,7 @@ class MainWindow(QMainWindow):
     
     def send_instructions_pull_and_hold(self,event):
         
-        # print('-----------------')
-        # print('Anchor1 Rl: ' + str(self.Anchor1))
-        # print('Anchor2 Rl: ' + str(self.Anchor2))
-        # print('Segment Length Rl: ' + str(self.PaHSegmentLength))
-        # print('HalfPoint Rl: ' + str(self.HalfPoint))
-        # print('Cantilever Tip Rl: ' + str(self.StartingTipPosition))
-        # print('Final Position Rl: ' + str(self.PaHFinalStrainPoint))
-        # print('Buffer Position Rl: ' + str(self.PaHBufferPoint))
-        # print('Bow Drawing Distance Rl: ' + str(self.PaHBowDrawingDistance))
-        # print('-----------------')
-        # print('Anchor1 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor1)))
-        # print('Anchor2 Image: ' + str(self.transform_coordinates_rl2image(self.Anchor2)))
-        # print('Segment Length Image: ' + str(self.transform_coordinates_rl2image(self.PaHSegmentLength)))
-        # print('HalfPoint Image: ' + str(self.transform_coordinates_rl2image(self.HalfPoint)))
-        # print('Cantilever Tip Image: ' + str(self.transform_coordinates_rl2image(self.StartingTipPosition)))
-        # print('Final Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint)))
-        # print('Buffer Position Image: ' + str(self.transform_coordinates_rl2image(self.PaHBufferPoint)))
-        # print('Bow Drawing Distance Image: ' + str(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance)))
-        # print('-----------------')
-        # print('Anchor1 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor1))))
-        # print('Anchor2 R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.Anchor2))))
-        # print('Segment Length R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHSegmentLength))))
-        # print('HalfPoint R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.HalfPoint))))
-        # print('Cantilever Tip R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.StartingTipPosition))))
-        # print('Final Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint))))
-        # print('Buffer Position R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBufferPoint))))
-        # print('Bow Drawing Distance R2I2R: ' + str(self.transform_coordinates_image2rl(self.transform_coordinates_rl2image(self.PaHBowDrawingDistance))))
-        # print('-----------------')
-        # print('Buffer Position: ' + str(self.PaHBufferPoint))
-        # print('Final Position: ' + str(self.PaHFinalStrainPoint))
-        # print('')
-        # print('Projected Movement Time [s]: ' + str(self.PaHTotalMovementTime))
-        # print('-----------------')
-        
-        # print(self.Im2RlScalingVector)
-        # print(self.Rl2ImScalingVector)
-        # print(self.RlOriginInImage)
-        # print(self.ImageOriginInRl)
-        
-        # sys.stdout.flush()
-        
-        InList = [['PullAndHold'],
+        InList = [['PullAndHold',str(self.RecordRealTimeScan),str(self.RecordVideo),str(self.RecordVideoNthFrame)],
                   [str(self.PaHBufferPoint[0]),str(self.PaHBufferPoint[1]),str(self.PositioningVelocity),'0','Retracted'],
                   [str(self.HalfPoint[0]),str(self.HalfPoint[1]),str(self.PaHStrainRate),'0','Approached'],
                   [str(self.PaHFinalStrainPoint[0]),str(self.PaHFinalStrainPoint[1]),str(self.PaHStrainRate),str(self.PaHHoldingTime),'Approached'],
@@ -511,7 +499,7 @@ class MainWindow(QMainWindow):
         
         PositionCheckHoldingTime = '1'
         
-        InList = [['PullAndHoldPositionCheck'],
+        InList = [['PullAndHoldPositionCheck',str(self.RecordRealTimeScan),str(self.RecordVideo),str(self.RecordVideoNthFrame)],
                   [str(self.Anchor1[0]),str(self.Anchor1[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
                   [str(self.Anchor2[0]),str(self.Anchor2[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
                   [str(self.PaHBufferPoint[0]),str(self.PaHBufferPoint[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
@@ -527,6 +515,15 @@ class MainWindow(QMainWindow):
         
         Instructions = [self.InstructionStartString]
         
+        # Clip all numbers outside of piezorange
+        First = InList.pop(0)
+        for S in InList:
+            S[0] = str(np.clip(float(S[0]),self.LowerPiezoRange,self.UpperPiezoRange))
+            S[1] = str(np.clip(float(S[1]),self.LowerPiezoRange,self.UpperPiezoRange))
+        
+        InList.insert(0, First)
+        
+        # Join them together
         for S in InList:
             InstructionLine = ';'.join(S)
             Instructions.append(InstructionLine)
