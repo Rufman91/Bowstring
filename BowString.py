@@ -7,12 +7,12 @@ checkVersion('SPM', 6, 1, 158)
 from com.jpk.inst.lib import JPKScript
 from com.jpk.util import XYPosition
 from com.jpk.util.jyswingutils import callSwing
+from datetime import datetime
 import httplib
 import os
 import time
 import subprocess
 import shlex
-import psutil
 
 
 class CurrentXYScannerControl:
@@ -60,7 +60,8 @@ class CurrentXYScannerControl:
             return self.getMaxScanRectangle().contains(x, y)
 
 
-def execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame):
+def execute_instruction_list(Points,TTLInstance,Mode,
+RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName):
     
     #take the image that is then sent to the widget
     #TODO
@@ -70,11 +71,13 @@ def execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVi
     #CurPos = ScannerInstance.getCurrentPosition().get_translated(0,0)
     
     if RecordRealTimeScan:
-        RealTimeScan.setFilenameRoot(Mode)
+        RealTimeScan.setOutputDirectory(TargetDir)
+        RealTimeScan.setFilenameRoot(Mode + '_' + RootName)
         RealTimeScan.setAutosave(True)
         RealTimeScan.startScanning()
     if RecordVideo:
-        Snapshooter.startImageSequenceSaving('jpg', RecordVideoNthFrame, Mode)
+        Snapshooter.startImageSequenceSaving('jpg',
+        RecordVideoNthFrame, os.path.join(TargetDir,Mode + '_' + RootName))
         
     # Go though the points with Speed and print the points name
     # each time the position is reached. Then wait for WaitTime
@@ -83,10 +86,12 @@ def execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVi
     # X-Y-Scanner inform the user and move on to the next point.
     
     for P in Points:
-        if P[3]=='Approached' and not PiezoEngaged:
+        if P[4]=='Approached' and not PiezoEngaged:
+            print('Approaching...')
             Scanner.approach()
             PiezoEngaged = True
-        elif P[3]=='Retracted' and PiezoEngaged:
+        elif P[4]=='Retracted' and PiezoEngaged:
+            print('Retracting...')
             Scanner.retractPiezo()
             PiezoEngaged = False
         TTLInstance.trigger_pulse()
@@ -97,18 +102,19 @@ def execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVi
     # Stop recordings
     if RecordRealTimeScan:
         RealTimeScan.stopScanning()
+        RealTimeScan.setAutosave(False)
+        RealTimeScan.startScanning()
     if RecordVideo:
         Snapshooter.stopImageSequenceSaving()
+
+    print('\nProcess complete. Waiting for new instructions...\n')
     
 
-def parse_and_execute_instructions(InList,TTLInstance):
+def parse_and_execute_instructions(InList,TTLInstance,TargetDir,RootName):
     
     SplitList = []
     for S in InList:
         SplitList.append(S.split(';'))
-    
-    print(InList)
-    print(SplitList)
     
     StartStringCounter = 0
     EndStringCounter = 0
@@ -125,9 +131,22 @@ def parse_and_execute_instructions(InList,TTLInstance):
     ModeSettings = SplitList.pop(0)
     print(ModeSettings)
     Mode = ModeSettings[0]
-    RecordRealTimeScan = bool(ModeSettings[1])
-    RecordVideo = bool(ModeSettings[2])
+    if ModeSettings[1]=='True':
+        RecordRealTimeScan = True
+    elif ModeSettings[1]=='False':
+        RecordRealTimeScan = False
+    else:
+        print('Error: Instructions are faulty!')
+        return
+    if ModeSettings[2]=='True':
+        RecordVideo = True
+    elif ModeSettings[2]=='False':
+        RecordVideo = False
+    else:
+        print('Error: Instructions are faulty!')
+        return
     RecordVideoNthFrame = int(ModeSettings[3])
+    Points = []
     
     Points = []
     for S in SplitList:
@@ -135,28 +154,43 @@ def parse_and_execute_instructions(InList,TTLInstance):
         Points.append(P)
     
     if Mode=='PullAndHold':
-        execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame)
+        execute_instruction_list(Points,TTLInstance,Mode,
+        RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName)
     elif Mode=='PullAndHoldPositionCheck':
-        execute_instruction_list(Points,TTLInstance,Mode,RecordRealTimeScan,RecordVideo,RecordVideoNthFrame)
+        execute_instruction_list(Points,TTLInstance,Mode,
+        RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName)
     else:
         print('%s is not an available Bowstring-mode' % Mode)
     return
 
 #################### Execution #############################
 
-# Set the scanner
-xyScanner = CurrentXYScannerControl()
-print(xyScanner.getCurrentPosition())
-#quit('Just need current position')
-#xyScanner.moveToXYPosition(0,0)
+# First, set target directory and file name root
+TargetDir = "/home/jpkuser/jpkdata/Jaritz_Simon_AFM/2022_09_22-BowstringStretching/"
+RootName = "Fibril-01_"
+
+DT = datetime.now().isoformat().replace('.','-').replace(':','-')
 
 # set TTLOutput pulse for later segmentation
 output = TTLOutput.outputs['Pin 4']
 output.style = 'PULSE'
-output.pulse_time = 0.05
+output.pulse_time = 0.01
 
-FullCommand = """python BowstringWidget.py 1e-6 1.4e-6 "BSFibril-14.tif"
-"""
+# Set the scanner
+xyScanner = CurrentXYScannerControl()
+print(xyScanner.getCurrentPosition())
+#xyScanner.moveToXYPosition(0,0)
+
+CurPos = xyScanner.getCurrentPosition()
+CurX = CurPos.getX()
+CurY = CurPos.getY()
+
+ImagePath = os.path.join(TargetDir,RootName + '_InImage_' + DT)
+Snapshooter.saveOpticalSnapshot(ImagePath)
+
+FullCommand = """./jpkdata/Jaritz_Simon_AFM/BowstringApp/dist/BowstringWidget/BowstringWidget
+%e %e "%s"
+""" % (CurX,CurY,ImagePath)
 
 SplitCommand = shlex.split(FullCommand)
 
@@ -166,27 +200,21 @@ SplitCommand = shlex.split(FullCommand)
 cmd = SplitCommand
 
 
-with subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=True) as p:
-    Instructions=['Waiting']
-    psProcess = psutil.Process(pid=p.pid)
-    for line in p.stdout:
-        if line=='InstructionStart\n':
-            Instructions = ['InstructionStart']
-        elif line=='InstructionEnd\n' and Instructions[0]=='InstructionStart':
-            Instructions.append(line[0:-1])
-            # psProcess.suspend()
-            BlockNewInstructions = True
-            parse_and_execute_instructions(Instructions)
-            # psProcess.resume()
-            Instructions = ['Waiting']
-        elif Instructions[0]=='Waiting':
-            print('Waiting...')
-            continue
-        else:
-            Instructions.append(line[0:-1])
-        # print(Instructions)
-        # print(line)
+p = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=True)
+Instructions=['Waiting']
+for line in p.stdout:
+    if line=='InstructionStart\n':
+        Instructions = ['InstructionStart']
+    elif line=='InstructionEnd\n' and Instructions[0]=='InstructionStart':
+        Instructions.append(line[0:-1])
+        BlockNewInstructions = True
+        parse_and_execute_instructions(Instructions,output,TargetDir,RootName)
+        Instructions = ['Waiting']
+    elif Instructions[0]=='Waiting':
+        print('Waiting...')
+        continue
+    else:
+        Instructions.append(line[0:-1])
 
-# run the desired program here
 
 print('Program ended successfully')

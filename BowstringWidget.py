@@ -457,6 +457,7 @@ class MainWindow(QMainWindow):
         else:
             Bool = False
             self.StartPaHButton.setEnabled(False)
+            self.StartPaHPCButton.setEnabled(False)
         
         return Bool
     
@@ -481,6 +482,10 @@ class MainWindow(QMainWindow):
         self.Pixmap.paintEvent(InPoints2,'Bowstring Geometry')
         self.Pixmap.paintEvent(self.Points,'User Points')
         self.Image.setPixmap(self.Pixmap)
+        
+    def enable_instruction_send_buttons(self,Bool):
+        self.StartPaHButton.setEnabled(Bool)
+        self.StartPaHPCButton.setEnabled(Bool)
     
     def send_instructions_pull_and_hold(self,event):
         
@@ -531,31 +536,19 @@ class MainWindow(QMainWindow):
         Instructions.append(self.InstructionEndString)
         
         sys.stdout.flush()
-        time.sleep(.1)
         for S in Instructions:
             sys.stdout.write(S+'\n')
         
-        #TODO: This does not work as of now!!! Can chain multiple instructions being sent to jpk
-        
-        Btn1 = self.StartPaHButton.isEnabled()
-        Btn2 = self.StartPaHPCButton.isEnabled()
-        
-        self.StartPaHButton.setEnabled(False)
-        self.StartPaHPCButton.setEnabled(False)
-        
         #freeze the main window so no new instructions can be sent
-        ModalDlg = QDialog(self)
-        ModalDlg.setWindowTitle('Executing instructions...')
-        ModalDlg.setModal(True)
-        ModalDlg.show()
+        # ModalDlg = QDialog(self)
+        # ModalDlg.setWindowTitle('Executing instructions...')
+        # ModalDlg.setModal(True)
+        # ModalDlg.show()
         
         sys.stdout.flush()
-        time.sleep(2)
         
-        ModalDlg.reject()
+        # ModalDlg.reject()
         
-        self.StartPaHButton.setEnabled(Btn1)
-        self.StartPaHPCButton.setEnabled(Btn2)
         
         return Instructions
     
