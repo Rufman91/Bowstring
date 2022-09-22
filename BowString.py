@@ -76,8 +76,9 @@ RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName):
         RealTimeScan.setAutosave(True)
         RealTimeScan.startScanning()
     if RecordVideo:
+        Now = datetime.now().isoformat().replace('.','-').replace(':','-')
         Snapshooter.startImageSequenceSaving('jpg',
-        RecordVideoNthFrame, os.path.join(TargetDir,Mode + '_' + RootName))
+        RecordVideoNthFrame, os.path.join(TargetDir,Mode + '_' + RootName + '_' + Now,Mode + '_' + RootName + '_' + Now))
         
     # Go though the points with Speed and print the points name
     # each time the position is reached. Then wait for WaitTime
@@ -163,13 +164,17 @@ def parse_and_execute_instructions(InList,TTLInstance,TargetDir,RootName):
         print('%s is not an available Bowstring-mode' % Mode)
     return
 
-#################### Execution #############################
 
-# First, set target directory and file name root
+#######################################################################
+############################### Execution #############################
+#######################################################################
+
+
+# DEAR USER: First, set target directory and file name root
+# Then just press 'Run' up above in the Experiment Planner
 TargetDir = "/home/jpkuser/jpkdata/Jaritz_Simon_AFM/2022_09_22-BowstringStretching/"
-RootName = "Fibril-01_"
+RootName = "FullFPS-RecordingTest"
 
-DT = datetime.now().isoformat().replace('.','-').replace(':','-')
 
 # set TTLOutput pulse for later segmentation
 output = TTLOutput.outputs['Pin 4']
@@ -185,6 +190,7 @@ CurPos = xyScanner.getCurrentPosition()
 CurX = CurPos.getX()
 CurY = CurPos.getY()
 
+DT = datetime.now().isoformat().replace('.','-').replace(':','-')
 ImagePath = os.path.join(TargetDir,RootName + '_InImage_' + DT)
 Snapshooter.saveOpticalSnapshot(ImagePath)
 
