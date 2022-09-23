@@ -172,27 +172,34 @@ def parse_and_execute_instructions(InList,TTLInstance,TargetDir,RootName):
 
 # DEAR USER: First, set target directory and file name root
 # Then just press 'Run' up above in the Experiment Planner
-TargetDir = "/home/jpkuser/jpkdata/Jaritz_Simon_AFM/2022_09_22-BowstringStretching/"
-RootName = "FullFPS-RecordingTest"
+TargetDir = "/home/jpkuser/jpkdata/Jaritz_Simon_AFM/2022_09_23-BowstringStretching/"
+RootName = "Image2Piezo-PrecisionTest"
 
+# DEAR USER: If desired, reposition the AFM tip e.g. to the top left (x=-4.9e-5,y=4.9e-5)
+# before starting the experiment# Set the scanner
+xyScanner = CurrentXYScannerControl()
+print(xyScanner.getCurrentPosition())
+#xyScanner.moveToXYPosition(0,0)
+RepositionFirst = True
+if RepositionFirst:
+    Scanner.retractPiezo()
+    xyScanner.moveToXYPosition(4.9e-5,4.9e-5)
+    print(xyScanner.getCurrentPosition())
 
 # set TTLOutput pulse for later segmentation
 output = TTLOutput.outputs['Pin 4']
 output.style = 'PULSE'
 output.pulse_time = 0.01
 
-# Set the scanner
-xyScanner = CurrentXYScannerControl()
-print(xyScanner.getCurrentPosition())
-#xyScanner.moveToXYPosition(0,0)
-
 CurPos = xyScanner.getCurrentPosition()
 CurX = CurPos.getX()
 CurY = CurPos.getY()
 
+Scanner.approach()
 DT = datetime.now().isoformat().replace('.','-').replace(':','-')
 ImagePath = os.path.join(TargetDir,RootName + '_InImage_' + DT)
 Snapshooter.saveOpticalSnapshot(ImagePath)
+Scanner.retractPiezo()
 
 FullCommand = """./jpkdata/Jaritz_Simon_AFM/BowstringApp/dist/BowstringWidget/BowstringWidget
 %e %e "%s"
