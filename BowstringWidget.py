@@ -122,19 +122,31 @@ class MainWindow(QMainWindow):
         self.UpperPiezoRange = 4.999e-5
         self.LowerPiezoRange = -4.999e-5
         
+        # General settings
         self.PositioningVelocity = float(1e-5)
         self.RecordVideo = False
         self.RecordVideoNthFrame = 5
         self.RecordRealTimeScan = True
+        self.PixelSize = float(4.65e-6)
+        self.Magnification = float(10)
         
         self.PointCounter = 0
         self.Points = list()
+        
+        #Pull and Hold mode
         self.PaHStrainRate = float(2e-6)
         self.PaHFinalStrain = float(.2)
-        self.PixelSize = float(4.65e-6)
-        self.Magnification = float(10)
-        self.Tip2HalfPointBuffer = float(1e-5)
+        self.PaHTip2HalfPointBuffer = float(1e-5)
         self.PaHHoldingTime = 0
+        
+        # Scratch off mode
+        self.SOStrainRate = float(2e-6)
+        self.SOFinalStrain = float(.2)
+        self.SOTip2HalfPointBuffer = float(1e-5)
+        self.SODistToAnchors = float(1e-5)
+        self.SONumScratchPoints = 20
+        self.SONumRepeats = 1
+        self.SOShowScratchLines = True
         
         toolbar = QToolBar('My main toolbar')
         toolbar.setIconSize(QSize(64,64))
@@ -182,6 +194,10 @@ class MainWindow(QMainWindow):
         Title1.setFont(QFont('Arial',self.TitleFontSize))
         Title1.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
+        Title2 = QLabel('Scratch Off')
+        Title2.setFont(QFont('Arial',self.TitleFontSize))
+        Title2.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
         self.MaxEditLength = 10
         
         InputText1 = QLabel('Choose a strain rate [um/s]:')
@@ -205,7 +221,7 @@ class MainWindow(QMainWindow):
         Input4.setValidator(QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
         InputText5 = QLabel('Tip-to-Halfpoint Buffer [um]:')
-        Input5 = QLineEdit('%.2f' % (self.Tip2HalfPointBuffer*1e6))
+        Input5 = QLineEdit('%.2f' % (self.PaHTip2HalfPointBuffer*1e6))
         Input5.setMaxLength(self.MaxEditLength)
         Input5.setValidator(QDoubleValidator())
         Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
@@ -241,12 +257,51 @@ class MainWindow(QMainWindow):
         self.StartPaHPCButton.mousePressEvent = self.send_instructions_pull_and_hold_position_check
         self.StartPaHPCButton.setEnabled(False)
         
-        Spacing = 14
+        
+        InputText11 = QLabel('Choose a strain rate [um/s]:',QSizePolicy.setVerticalPolicy(QSizePolicy.Preferred))
+        Input11 = QLineEdit('%.2f' % (self.SOStrainRate*1e6))
+        Input11.setMaxLength(self.MaxEditLength)
+        Input11.setValidator(QDoubleValidator())
+        Input11.textChanged.connect(self.set_so_strain_rate)
+        InputText12 = QLabel('Choose the final strain [%]:')
+        Input12 = QLineEdit('%.2f' % (self.SOFinalStrain*100))
+        Input12.setMaxLength(self.MaxEditLength)
+        Input12.setValidator(QDoubleValidator())
+        Input12.textChanged.connect(self.set_so_final_strain)
+        InputText13 = QLabel('Tip-to-String-Buffer [um]:')
+        Input13 = QLineEdit('%.2f' % (self.SOTip2HalfPointBuffer*1e6))
+        Input13.setMaxLength(self.MaxEditLength)
+        Input13.setValidator(QDoubleValidator())
+        Input13.textChanged.connect(self.set_so_tip_to_string_buffer)
+        InputText14 = QLabel('Safety Distance to Anchors [um]:')
+        Input14 = QLineEdit('%.2f' % (self.SODistToAnchors*1e6))
+        Input14.setMaxLength(self.MaxEditLength)
+        Input14.setValidator(QDoubleValidator())
+        Input14.textChanged.connect(self.set_so_safety_distance_to_anchors)
+        InputText15 = QLabel('Set number of scratching points: N =')
+        Input15 = QLineEdit('%d' % self.SONumScratchPoints)
+        Input15.setMaxLength(4)
+        Input15.setValidator(QIntValidator())
+        Input15.textChanged.connect(self.set_so_number_of_scratch_points)
+        InputText16 = QLabel('Set number of repeats: N =')
+        Input16 = QLineEdit('%d' % self.SONumRepeats)
+        Input16.setMaxLength(4)
+        Input16.setValidator(QIntValidator())
+        Input16.textChanged.connect(self.set_so_number_of_repeats)
+        Input17 = QCheckBox('Show Scratch-Off Lines')
+        Input17.setChecked(self.SOShowScratchLines)
+        Input17.stateChanged.connect(self.set_so_show_scratch_lines)
+        
+        self.StartSOButton = QPushButton('Start Scratching Off')
+        self.StartSOButton.mousePressEvent = self.send_instructions_scratch_off
+        self.StartSOButton.setEnabled(False)
+        
+        Spacing = 24
         Grid = QGridLayout()
         Grid.setSpacing(Spacing)
         Grid.addWidget(self.ImageDescription,0,0)
-        Grid.addWidget(self.Image,1,0,Spacing,1)
-        
+        Grid.addWidget(self.Image,1,0,Spacing-12,1)
+        # General Settings
         Grid.addWidget(Title0,1,1,1,4)
         Grid.addWidget(InputText7,2,1)
         Grid.addWidget(Input7,2,2)
@@ -258,7 +313,7 @@ class MainWindow(QMainWindow):
         Grid.addWidget(Input9,6,1,1,2)
         Grid.addWidget(InputText10,7,1)
         Grid.addWidget(Input10,7,2)
-        
+        # Pull and Hold
         Grid.addWidget(Title1,8,1,1,2)
         Grid.addWidget(InputText1,9,1)
         Grid.addWidget(Input1,9,2)
@@ -270,6 +325,22 @@ class MainWindow(QMainWindow):
         Grid.addWidget(Input6,12,2)
         Grid.addWidget(self.StartPaHPCButton,13,1,1,2)
         Grid.addWidget(self.StartPaHButton,14,1,1,2)
+        # Scratch Off
+        Grid.addWidget(Title2,15,1,1,2)
+        Grid.addWidget(InputText11,16,1)
+        Grid.addWidget(Input11,16,2)
+        Grid.addWidget(InputText12,17,1)
+        Grid.addWidget(Input12,17,2)
+        Grid.addWidget(InputText13,18,1)
+        Grid.addWidget(Input13,18,2)
+        Grid.addWidget(InputText14,19,1)
+        Grid.addWidget(Input14,19,2)
+        Grid.addWidget(InputText15,20,1)
+        Grid.addWidget(Input15,21,2)
+        Grid.addWidget(InputText16,22,1)
+        Grid.addWidget(Input16,22,2)
+        Grid.addWidget(Input17,23,2)
+        Grid.addWidget(self.StartSOButton,24,1,1,2)
         
         self.Widget = QWidget()
         self.Widget.setLayout(Grid)
@@ -339,7 +410,7 @@ class MainWindow(QMainWindow):
         if not s:
             return
         s = s.replace(',','.')
-        self.Tip2HalfPointBuffer = float(s)*1e-6
+        self.PaHTip2HalfPointBuffer = float(s)*1e-6
         self.draw_geometry()
         
     def set_holding_time(self,s):
@@ -367,6 +438,51 @@ class MainWindow(QMainWindow):
         
     def set_record_video(self,s):
         self.RecordVideo = bool(s)
+        
+    def set_so_strain_rate(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SOStrainRate = float(s)*1e-6
+        self.draw_geometry()
+        
+    def set_so_final_strain(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SOFinalStrain = float(s)/100
+        self.draw_geometry()
+        
+    def set_so_tip_to_string_buffer(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SOTip2HalfPointBuffer = float(s)*1e-6
+        self.draw_geometry()
+        
+    def set_so_safety_distance_to_anchors(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SODistToAnchors = float(s)*1e-6
+        self.draw_geometry()
+        
+    def set_so_number_of_scratch_points(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SONumScratchPoints = int(s)
+        self.draw_geometry()
+        
+    def set_so_number_of_repeats(self,s):
+        if not s:
+            return
+        s = s.replace(',','.')
+        self.SONumRepeats = int(s)
+        self.draw_geometry()
+        
+    def set_so_show_scratch_lines(self,s):
+        self.SOShowScratchLines = bool(s)
     
     def transform_coordinates_image2rl(self,InPoint):
         
@@ -436,10 +552,10 @@ class MainWindow(QMainWindow):
         self.HalfPoint = (self.Anchor1+self.Anchor2)/2
         self.SegmentDirection = (self.Anchor1 - self.Anchor2)/self.PaHSegmentLength
         self.PerpendicularDirection = np.array([-self.SegmentDirection[1],self.SegmentDirection[0]])
-        self.PaHBufferPoint = self.HalfPoint - self.PerpendicularDirection*self.Tip2HalfPointBuffer
+        self.PaHBufferPoint = self.HalfPoint - self.PerpendicularDirection*self.PaHTip2HalfPointBuffer
         self.PaHBowDrawingDistance = self.PaHSegmentLength/2*np.sqrt((1+self.PaHFinalStrain)**2 - 1)
         self.PaHFinalStrainPoint = self.HalfPoint + self.PerpendicularDirection*self.PaHBowDrawingDistance
-        self.PaHTotalMovementTime = (self.PaHBowDrawingDistance + self.Tip2HalfPointBuffer)/self.PaHStrainRate
+        self.PaHTotalMovementTime = (self.PaHBowDrawingDistance + self.PaHTip2HalfPointBuffer)/self.PaHStrainRate
         
         if all([abs(self.PaHBufferPoint[0])<5e-5,abs(self.PaHBufferPoint[1])<5e-5,
                 abs(self.PaHFinalStrainPoint[0])<5e-5,abs(self.PaHFinalStrainPoint[1])<5e-5]):
@@ -452,7 +568,7 @@ class MainWindow(QMainWindow):
         
 
     def check_sufficient_information(self):
-        if len(self.Points)==3 and all([self.PaHStrainRate,self.PaHFinalStrain,self.Magnification,self.PixelSize,self.Tip2HalfPointBuffer]):
+        if len(self.Points)==3 and all([self.PaHStrainRate,self.PaHFinalStrain,self.Magnification,self.PixelSize,self.PaHTip2HalfPointBuffer]):
             Bool = True
         else:
             Bool = False
@@ -513,6 +629,21 @@ class MainWindow(QMainWindow):
                   [str(self.StartingTipPosition[0]),str(self.StartingTipPosition[1]),str(self.PositioningVelocity),PositionCheckHoldingTime,'Retracted'],
                   ]
         
+        Instructions = self.construct_and_send_instructions(InList)
+        
+    def send_instructions_scratch_off(self,event):
+        
+        SOHoldingTime = '0'
+        
+        InList = [['Scratch Off',str(self.RecordRealTimeScan),str(self.RecordVideo),str(self.RecordVideoNthFrame)]]
+        
+        for i in enumerate(self.SOFinalStrainPoints):
+                  InList.append([str(self.SOBufferPoints[i][0]),str(self.SOBufferPoints[0][1]),str(self.PositioningVelocity),SOHoldingTime,'Retracted'])
+                  InList.append([str(self.SOHalfPoints[i][0]),str(self.SOHalfPoints[i][1]),str(self.SOStrainRate),SOHoldingTime,'Approached'])
+                  InList.append([str(self.SOFinalStrainPoints[i][0]),str(self.SOFinalStrainPoints[i][1]),str(self.SOStrainRate),SOHoldingTime,'Approached'])
+
+        InList.append([str(self.StartingTipPosition[0]),str(self.StartingTipPosition[1]),str(self.PositioningVelocity),SOHoldingTime,'Retracted'])        
+
         Instructions = self.construct_and_send_instructions(InList)
         
         
