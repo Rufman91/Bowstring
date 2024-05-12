@@ -147,6 +147,7 @@ class MainWindow(QMainWindow):
         self.SONumScratchPoints = 20
         self.SONumRepeats = 1
         self.SOShowScratchLines = True
+        self.SOFinalStrainPoints = []
         
         toolbar = QToolBar('My main toolbar')
         toolbar.setIconSize(QSize(64,64))
@@ -184,54 +185,64 @@ class MainWindow(QMainWindow):
         self.Image.mousePressEvent = self.getPos
         
         
-        self.TitleFontSize = 22
+        self.TitleFontSize = 16
         
         Title0 = QLabel('General Settings')
+        Title0.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Title0.setFont(QFont('Arial',self.TitleFontSize))
         Title0.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         Title1 = QLabel('Pull and hold')
+        Title1.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Title1.setFont(QFont('Arial',self.TitleFontSize))
         Title1.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         Title2 = QLabel('Scratch Off')
+        Title2.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Title2.setFont(QFont('Arial',self.TitleFontSize))
         Title2.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         self.MaxEditLength = 10
         
         InputText1 = QLabel('Choose a strain rate [um/s]:')
+        InputText1.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input1 = QLineEdit('%.2f' % (self.PaHStrainRate*1e6))
         Input1.setMaxLength(self.MaxEditLength)
         Input1.setValidator(QDoubleValidator())
         Input1.textChanged.connect(self.set_strain_rate)
         InputText2 = QLabel('Choose the final strain [%]:')
+        InputText2.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input2 = QLineEdit('%.2f' % (self.PaHFinalStrain*100))
         Input2.setMaxLength(self.MaxEditLength)
         Input2.setValidator(QDoubleValidator())
         Input2.textChanged.connect(self.set_final_strain)
         InputText3 = QLabel('Camera Pixel Size [um]:')
+        InputText3.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input3 = QLineEdit('%.3f' % (self.PixelSize*1e6))
         Input3.setMaxLength(self.MaxEditLength)
         Input3.setValidator(QDoubleValidator())
         Input3.textChanged.connect(self.set_pixel_size)
         InputText4 = QLabel('Microscope magnification:')
+        InputText4.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input4 = QLineEdit('%.1f' % (self.Magnification))
         Input4.setMaxLength(self.MaxEditLength)
         Input4.setValidator(QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
         InputText5 = QLabel('Tip-to-Halfpoint Buffer [um]:')
+        InputText5.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input5 = QLineEdit('%.2f' % (self.PaHTip2HalfPointBuffer*1e6))
         Input5.setMaxLength(self.MaxEditLength)
         Input5.setValidator(QDoubleValidator())
         Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
         InputText6 = QLabel('Holding Time [s]:')
+        InputText6.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input6 = QLineEdit('%.2f' % self.PaHHoldingTime)
         Input6.setMaxLength(self.MaxEditLength)
         Input6.setValidator(QDoubleValidator())
         Input6.textChanged.connect(self.set_holding_time)
         
         InputText7 = QLabel('Positioning Velocity [um/s]:')
+        InputText7.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input7 = QLineEdit('%.1f' % (self.PositioningVelocity*1e6))
         Input7.setMaxLength(self.MaxEditLength)
         Input7.setValidator(QDoubleValidator())
@@ -243,6 +254,7 @@ class MainWindow(QMainWindow):
         Input9.setChecked(self.RecordVideo)
         Input9.stateChanged.connect(self.set_record_video)
         InputText10 = QLabel('Record every Nth frame: N =')
+        InputText10.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input10 = QLineEdit('%d' % self.RecordVideoNthFrame)
         Input10.setMaxLength(4)
         Input10.setValidator(QIntValidator())
@@ -258,32 +270,38 @@ class MainWindow(QMainWindow):
         self.StartPaHPCButton.setEnabled(False)
         
         
-        InputText11 = QLabel('Choose a strain rate [um/s]:',QSizePolicy.setVerticalPolicy(QSizePolicy.Preferred))
+        InputText11 = QLabel('Choose a strain rate [um/s]:')#,QSizePolicy.setVerticalPolicy(QSizePolicy.Minimum))
         Input11 = QLineEdit('%.2f' % (self.SOStrainRate*1e6))
         Input11.setMaxLength(self.MaxEditLength)
         Input11.setValidator(QDoubleValidator())
         Input11.textChanged.connect(self.set_so_strain_rate)
+        InputText11.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         InputText12 = QLabel('Choose the final strain [%]:')
+        InputText12.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input12 = QLineEdit('%.2f' % (self.SOFinalStrain*100))
         Input12.setMaxLength(self.MaxEditLength)
         Input12.setValidator(QDoubleValidator())
         Input12.textChanged.connect(self.set_so_final_strain)
         InputText13 = QLabel('Tip-to-String-Buffer [um]:')
+        InputText13.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input13 = QLineEdit('%.2f' % (self.SOTip2HalfPointBuffer*1e6))
         Input13.setMaxLength(self.MaxEditLength)
         Input13.setValidator(QDoubleValidator())
         Input13.textChanged.connect(self.set_so_tip_to_string_buffer)
         InputText14 = QLabel('Safety Distance to Anchors [um]:')
+        InputText14.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input14 = QLineEdit('%.2f' % (self.SODistToAnchors*1e6))
         Input14.setMaxLength(self.MaxEditLength)
         Input14.setValidator(QDoubleValidator())
         Input14.textChanged.connect(self.set_so_safety_distance_to_anchors)
         InputText15 = QLabel('Set number of scratching points: N =')
+        InputText15.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input15 = QLineEdit('%d' % self.SONumScratchPoints)
         Input15.setMaxLength(4)
         Input15.setValidator(QIntValidator())
         Input15.textChanged.connect(self.set_so_number_of_scratch_points)
         InputText16 = QLabel('Set number of repeats: N =')
+        InputText16.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         Input16 = QLineEdit('%d' % self.SONumRepeats)
         Input16.setMaxLength(4)
         Input16.setValidator(QIntValidator())
@@ -294,7 +312,7 @@ class MainWindow(QMainWindow):
         
         self.StartSOButton = QPushButton('Start Scratching Off')
         self.StartSOButton.mousePressEvent = self.send_instructions_scratch_off
-        self.StartSOButton.setEnabled(False)
+        self.StartSOButton.setEnabled(True)
         
         Spacing = 24
         Grid = QGridLayout()
@@ -349,8 +367,34 @@ class MainWindow(QMainWindow):
         
         self.setAcceptDrops(True)
         self.setWindowTitle('Bowstring') 
-        self.setGeometry(300, 300, 700, 600) 
+        self.setGeometry(200, 200, 1700, 1600) 
         self.show()
+        
+    def initialize_scratch_off_points(self):
+        # Assuming the distance between points is controlled by self.SODistToAnchors
+        # and the number of points by self.SONumScratchPoints
+        start_point = np.array([0, 0])  # This should be set based on actual start conditions
+        self.SOBufferPoints = [start_point]
+        self.SOHalfPoints = []
+        self.SOFinalStrainPoints = []
+    
+        for i in range(self.SONumScratchPoints):
+            next_point = start_point + np.array([self.SODistToAnchors * i, 0])  # Example linear distribution
+            self.SOBufferPoints.append(next_point)
+            # Adjust this calculation based on your specific experiment setup
+            half_point = next_point + np.array([0, self.SOTip2HalfPointBuffer])
+            self.SOHalfPoints.append(half_point)
+            final_point = half_point + np.array([0, self.SOFinalStrain * 100])  # Adjust for actual calculation
+            self.SOFinalStrainPoints.append(final_point)
+    
+        self.update_scratch_off_visualization()
+
+    def update_scratch_off_visualization(self):
+        # Visualize the scratch-off setup points
+        points = [self.transform_coordinates_rl2image(point) for point in self.SOFinalStrainPoints]
+        self.Pixmap.paintEvent(points, 'Scratch Off Points')  # This assumes your paintEvent can handle this new type
+        self.Image.setPixmap(self.Pixmap)
+
         
     def getPos(self , event):
         x = event.pos().x()
@@ -445,6 +489,7 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SOStrainRate = float(s)*1e-6
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_final_strain(self,s):
         if not s:
@@ -452,6 +497,7 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SOFinalStrain = float(s)/100
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_tip_to_string_buffer(self,s):
         if not s:
@@ -459,6 +505,7 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SOTip2HalfPointBuffer = float(s)*1e-6
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_safety_distance_to_anchors(self,s):
         if not s:
@@ -466,6 +513,7 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SODistToAnchors = float(s)*1e-6
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_number_of_scratch_points(self,s):
         if not s:
@@ -473,6 +521,7 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SONumScratchPoints = int(s)
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_number_of_repeats(self,s):
         if not s:
@@ -480,9 +529,11 @@ class MainWindow(QMainWindow):
         s = s.replace(',','.')
         self.SONumRepeats = int(s)
         self.draw_geometry()
+        self.initialize_scratch_off_points()
         
     def set_so_show_scratch_lines(self,s):
         self.SOShowScratchLines = bool(s)
+        self.initialize_scratch_off_points()
     
     def transform_coordinates_image2rl(self,InPoint):
         
@@ -568,14 +619,13 @@ class MainWindow(QMainWindow):
         
 
     def check_sufficient_information(self):
-        if len(self.Points)==3 and all([self.PaHStrainRate,self.PaHFinalStrain,self.Magnification,self.PixelSize,self.PaHTip2HalfPointBuffer]):
-            Bool = True
-        else:
-            Bool = False
-            self.StartPaHButton.setEnabled(False)
-            self.StartPaHPCButton.setEnabled(False)
-        
-        return Bool
+        valid_bow = len(self.Points) == 3 and all([self.PaHStrainRate, self.PaHFinalStrain, self.Magnification, self.PixelSize, self.PaHTip2HalfPointBuffer])
+        valid_scratch = len(self.SOFinalStrainPoints) > 0  # Ensure points are initialized
+        self.StartPaHButton.setEnabled(valid_bow)
+        self.StartPaHPCButton.setEnabled(valid_bow)
+        self.StartSOButton.setEnabled(valid_scratch)
+        return valid_bow or valid_scratch
+
     
     def paint_experiment(self):
         
@@ -692,3 +742,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    
+    
