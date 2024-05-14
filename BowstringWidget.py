@@ -13,6 +13,8 @@ import time
 import sys
 import os
 import numpy as np
+from calibration import load_images, detect_afm_head, phase_correlation, estimate_transformation, transform_coordinates
+
 
 class PaintPixmap(PyGui.QPixmap):
     def __init__(self, Path):
@@ -127,8 +129,13 @@ class MainWindow(PyWidgets.QMainWindow):
         self.RecordVideo = False
         self.RecordVideoNthFrame = 5
         self.RecordRealTimeScan = True
+        
+        # Coordiante Transformation Calibration
+        
         self.PixelSize = float(4.65e-6)
         self.Magnification = float(10)
+        self.calibration_matrix = None
+        self.use_model_based_transformation = True
 
         self.PointCounter = 0
         self.Points = list()
@@ -185,196 +192,194 @@ class MainWindow(PyWidgets.QMainWindow):
         self.Image.setAlignment(PyCore.Qt.AlignHCenter | PyCore.Qt.AlignTop)
         self.Image.mousePressEvent = self.getPos
 
+        # New Calibration Section
         self.TitleFontSize = 16
-
-        Title0 = PyWidgets.QLabel('General Settings')
-        Title0.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Title0.setFont(PyGui.QFont('Arial', self.TitleFontSize))
-        Title0.setAlignment(PyCore.Qt.AlignRight | PyCore.Qt.AlignVCenter)
-
-        Title1 = PyWidgets.QLabel('Pull and hold')
-        Title1.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Title1.setFont(PyGui.QFont('Arial', self.TitleFontSize))
-        Title1.setAlignment(PyCore.Qt.AlignRight | PyCore.Qt.AlignVCenter)
-
-        Title2 = PyWidgets.QLabel('Scratch Off')
-        Title2.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Title2.setFont(PyGui.QFont('Arial', self.TitleFontSize))
-        Title2.setAlignment(PyCore.Qt.AlignRight | PyCore.Qt.AlignVCenter)
-
         self.MaxEditLength = 10
 
-        InputText1 = PyWidgets.QLabel('Choose a strain rate [um/s]:')
-        InputText1.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input1 = PyWidgets.QLineEdit('%.2f' % (self.PaHStrainRate * 1e6))
-        Input1.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input1.setMaxLength(self.MaxEditLength)
-        Input1.setValidator(PyGui.QDoubleValidator())
-        Input1.textChanged.connect(self.set_strain_rate)
-        InputText2 = PyWidgets.QLabel('Choose the final strain [%]:')
-        InputText2.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input2 = PyWidgets.QLineEdit('%.2f' % (self.PaHFinalStrain * 100))
-        Input2.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input2.setMaxLength(self.MaxEditLength)
-        Input2.setValidator(PyGui.QDoubleValidator())
-        Input2.textChanged.connect(self.set_final_strain)
-        InputText3 = PyWidgets.QLabel('Camera Pixel Size [um]:')
-        InputText3.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input3 = PyWidgets.QLineEdit('%.3f' % (self.PixelSize * 1e6))
-        Input3.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input3.setMaxLength(self.MaxEditLength)
-        Input3.setValidator(PyGui.QDoubleValidator())
-        Input3.textChanged.connect(self.set_pixel_size)
-        InputText4 = PyWidgets.QLabel('Microscope magnification:')
-        InputText4.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input4 = PyWidgets.QLineEdit('%.1f' % (self.Magnification))
-        Input4.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input4.setMaxLength(self.MaxEditLength)
-        Input4.setValidator(PyGui.QDoubleValidator())
-        Input4.textChanged.connect(self.set_magnification)
-        InputText5 = PyWidgets.QLabel('Tip-to-Halfpoint Buffer [um]:')
-        InputText5.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input5 = PyWidgets.QLineEdit('%.2f' % (self.PaHTip2HalfPointBuffer * 1e6))
-        Input5.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input5.setMaxLength(self.MaxEditLength)
-        Input5.setValidator(PyGui.QDoubleValidator())
-        Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
-        InputText6 = PyWidgets.QLabel('Holding Time [s]:')
-        InputText6.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input6 = PyWidgets.QLineEdit('%.2f' % self.PaHHoldingTime)
-        Input6.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
-        Input6.setMaxLength(self.MaxEditLength)
-        Input6.setValidator(PyGui.QDoubleValidator())
-        Input6.textChanged.connect(self.set_holding_time)
+        # General Settings
+        Title0 = PyWidgets.QLabel('General Settings')
+        Title0.setFont(PyGui.QFont('Arial', self.TitleFontSize))
 
         InputText7 = PyWidgets.QLabel('Positioning Velocity [um/s]:')
-        InputText7.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input7 = PyWidgets.QLineEdit('%.1f' % (self.PositioningVelocity * 1e6))
-        Input7.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input7.setMaxLength(self.MaxEditLength)
         Input7.setValidator(PyGui.QDoubleValidator())
         Input7.textChanged.connect(self.set_positioning_velocity)
+        
         Input8 = PyWidgets.QCheckBox('Record Real Time Scan:')
-        Input8.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input8.setChecked(self.RecordRealTimeScan)
         Input8.stateChanged.connect(self.set_record_real_time_scan)
+        
         Input9 = PyWidgets.QCheckBox('Record Real Time Video:')
-        Input9.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input9.setChecked(self.RecordVideo)
         Input9.stateChanged.connect(self.set_record_video)
+        
         InputText10 = PyWidgets.QLabel('Record every Nth frame: N =')
-        InputText10.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input10 = PyWidgets.QLineEdit('%d' % self.RecordVideoNthFrame)
-        Input10.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input10.setMaxLength(4)
         Input10.setValidator(PyGui.QIntValidator())
         Input10.textChanged.connect(self.set_record_video_nth_frame)
 
+        # Coordinate Transformation Calibration
+        TitleCalibration = PyWidgets.QLabel('Coordinate Transformation Calibration')
+        TitleCalibration.setFont(PyGui.QFont('Arial', self.TitleFontSize))
+
+        InputText3 = PyWidgets.QLabel('Camera Pixel Size [um]:')
+        Input3 = PyWidgets.QLineEdit('%.3f' % (self.PixelSize * 1e6))
+        Input3.setMaxLength(self.MaxEditLength)
+        Input3.setValidator(PyGui.QDoubleValidator())
+        Input3.textChanged.connect(self.set_pixel_size)
+        
+        InputText4 = PyWidgets.QLabel('Microscope Magnification:')
+        Input4 = PyWidgets.QLineEdit('%.1f' % (self.Magnification))
+        Input4.setMaxLength(self.MaxEditLength)
+        Input4.setValidator(PyGui.QDoubleValidator())
+        Input4.textChanged.connect(self.set_magnification)
+
+        self.CalibrateButton = PyWidgets.QPushButton('Start Calibration')
+        self.CalibrateButton.clicked.connect(self.start_calibration)
+
+        self.TransformSwitch = PyWidgets.QCheckBox('Use Model-Based Transformation')
+        self.TransformSwitch.setChecked(True)
+        self.TransformSwitch.stateChanged.connect(self.switch_transformation)
+        self.TransformSwitch.setEnabled(False)  # Disabled initially
+
+        # Layout adjustments
+        Spacing = 24
+        Grid = PyWidgets.QGridLayout()
+        Grid.setSpacing(Spacing)
+        
+        # Add the image description and image
+        Grid.addWidget(self.ImageDescription, 0, 0, 1, 4)
+        Grid.addWidget(self.Image, 1, 0, Spacing-1, 4)
+        
+        # General Settings
+        Grid.addWidget(Title0, 0, 4, 1, 2)
+        Grid.addWidget(InputText7, 1, 4)
+        Grid.addWidget(Input7, 1, 5)
+        Grid.addWidget(Input8, 2, 4, 1, 2)
+        Grid.addWidget(Input9, 3, 4, 1, 2)
+        Grid.addWidget(InputText10, 4, 4)
+        Grid.addWidget(Input10, 4, 5)
+        
+        # Coordinate Transformation Calibration
+        Grid.addWidget(TitleCalibration, 5, 4, 1, 2)
+        Grid.addWidget(InputText3, 6, 4)
+        Grid.addWidget(Input3, 6, 5)
+        Grid.addWidget(InputText4, 7, 4)
+        Grid.addWidget(Input4, 7, 5)
+        Grid.addWidget(self.CalibrateButton, 8, 4, 1, 2)
+        Grid.addWidget(self.TransformSwitch, 9, 4, 1, 2)
+
+        # Pull and Hold settings
+        Title1 = PyWidgets.QLabel('Pull and Hold')
+        Title1.setFont(PyGui.QFont('Arial', self.TitleFontSize))
+        InputText1 = PyWidgets.QLabel('Choose a strain rate [um/s]:')
+        Input1 = PyWidgets.QLineEdit('%.2f' % (self.PaHStrainRate * 1e6))
+        Input1.setMaxLength(self.MaxEditLength)
+        Input1.setValidator(PyGui.QDoubleValidator())
+        Input1.textChanged.connect(self.set_strain_rate)
+        
+        InputText2 = PyWidgets.QLabel('Choose the final strain [%]:')
+        Input2 = PyWidgets.QLineEdit('%.2f' % (self.PaHFinalStrain * 100))
+        Input2.setMaxLength(self.MaxEditLength)
+        Input2.setValidator(PyGui.QDoubleValidator())
+        Input2.textChanged.connect(self.set_final_strain)
+        
+        InputText5 = PyWidgets.QLabel('Tip-to-Halfpoint Buffer [um]:')
+        Input5 = PyWidgets.QLineEdit('%.2f' % (self.PaHTip2HalfPointBuffer * 1e6))
+        Input5.setMaxLength(self.MaxEditLength)
+        Input5.setValidator(PyGui.QDoubleValidator())
+        Input5.textChanged.connect(self.set_tip_to_halfpoint_buffer)
+        
+        InputText6 = PyWidgets.QLabel('Holding Time [s]:')
+        Input6 = PyWidgets.QLineEdit('%.2f' % self.PaHHoldingTime)
+        Input6.setMaxLength(self.MaxEditLength)
+        Input6.setValidator(PyGui.QDoubleValidator())
+        Input6.textChanged.connect(self.set_holding_time)
+        
         self.StartPaHButton = PyWidgets.QPushButton('Start Experiment')
         self.StartPaHButton.mousePressEvent = self.send_instructions_pull_and_hold
         self.StartPaHButton.setEnabled(False)
-
+        
         self.StartPaHPCButton = PyWidgets.QPushButton('Cycle Positions')
         self.StartPaHPCButton.mousePressEvent = self.send_instructions_pull_and_hold_position_check
         self.StartPaHPCButton.setEnabled(False)
 
-        InputText11 = PyWidgets.QLabel('Choose a strain rate [um/s]:')  # ,QSizePolicy.setVerticalPolicy(QSizePolicy.Minimum))
-        InputText11.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
+        Grid.addWidget(Title1, 10, 4, 1, 2)
+        Grid.addWidget(InputText1, 11, 4)
+        Grid.addWidget(Input1, 11, 5)
+        Grid.addWidget(InputText2, 12, 4)
+        Grid.addWidget(Input2, 12, 5)
+        Grid.addWidget(InputText5, 13, 4)
+        Grid.addWidget(Input5, 13, 5)
+        Grid.addWidget(InputText6, 14, 4)
+        Grid.addWidget(Input6, 14, 5)
+        Grid.addWidget(self.StartPaHPCButton, 15, 4, 1, 2)
+        Grid.addWidget(self.StartPaHButton, 16, 4, 1, 2)
+        
+        # Scratch Off settings
+        Title2 = PyWidgets.QLabel('Scratch Off')
+        Title2.setFont(PyGui.QFont('Arial', self.TitleFontSize))
+        InputText11 = PyWidgets.QLabel('Choose a strain rate [um/s]:')
         Input11 = PyWidgets.QLineEdit('%.2f' % (self.SOStrainRate * 1e6))
-        Input11.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input11.setMaxLength(self.MaxEditLength)
         Input11.setValidator(PyGui.QDoubleValidator())
         Input11.textChanged.connect(self.set_so_strain_rate)
-        InputText11.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
+        
         InputText12 = PyWidgets.QLabel('Choose the final strain [%]:')
-        InputText12.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input12 = PyWidgets.QLineEdit('%.2f' % (self.SOFinalStrain * 100))
-        Input12.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input12.setMaxLength(self.MaxEditLength)
         Input12.setValidator(PyGui.QDoubleValidator())
         Input12.textChanged.connect(self.set_so_final_strain)
+        
         InputText13 = PyWidgets.QLabel('Tip-to-String-Buffer [um]:')
-        InputText13.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input13 = PyWidgets.QLineEdit('%.2f' % (self.SOTip2HalfPointBuffer * 1e6))
-        Input13.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input13.setMaxLength(self.MaxEditLength)
         Input13.setValidator(PyGui.QDoubleValidator())
         Input13.textChanged.connect(self.set_so_tip_to_string_buffer)
+        
         InputText14 = PyWidgets.QLabel('Safety Distance to Anchors [um]:')
-        InputText14.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input14 = PyWidgets.QLineEdit('%.2f' % (self.SODistToAnchors * 1e6))
-        Input14.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input14.setMaxLength(self.MaxEditLength)
         Input14.setValidator(PyGui.QDoubleValidator())
         Input14.textChanged.connect(self.set_so_safety_distance_to_anchors)
+        
         InputText15 = PyWidgets.QLabel('Set number of scratching points: N =')
-        InputText15.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input15 = PyWidgets.QLineEdit('%d' % self.SONumScratchPoints)
-        Input15.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input15.setMaxLength(4)
         Input15.setValidator(PyGui.QIntValidator())
         Input15.textChanged.connect(self.set_so_number_of_scratch_points)
+        
         InputText16 = PyWidgets.QLabel('Set number of repeats: N =')
-        InputText16.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input16 = PyWidgets.QLineEdit('%d' % self.SONumRepeats)
-        Input16.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input16.setMaxLength(4)
         Input16.setValidator(PyGui.QIntValidator())
         Input16.textChanged.connect(self.set_so_number_of_repeats)
+        
         Input17 = PyWidgets.QCheckBox('Show Scratch-Off Lines')
-        Input17.setSizePolicy(PyWidgets.QSizePolicy.Preferred, PyWidgets.QSizePolicy.Preferred)
         Input17.setChecked(self.SOShowScratchLines)
         Input17.stateChanged.connect(self.set_so_show_scratch_lines)
-
+        
         self.StartSOButton = PyWidgets.QPushButton('Start Scratching Off')
         self.StartSOButton.mousePressEvent = self.send_instructions_scratch_off
         self.StartSOButton.setEnabled(False)
 
-        Spacing = 24
-        Grid = PyWidgets.QGridLayout()
-        Grid.setSpacing(Spacing)
-        Grid.addWidget(self.ImageDescription, 0, 0)
-        Grid.addWidget(self.Image, 1, 0, Spacing-1, 1)
-        # General Settings
-        Grid.addWidget(Title0, 1, 1, 1, 4)
-        Grid.addWidget(InputText7, 2, 1)
-        Grid.addWidget(Input7, 2, 2)
-        Grid.addWidget(InputText3, 3, 1)
-        Grid.addWidget(Input3, 3, 2)
-        Grid.addWidget(InputText4, 4, 1)
-        Grid.addWidget(Input4, 4, 2)
-        Grid.addWidget(Input8, 5, 1, 1, 2)
-        Grid.addWidget(Input9, 6, 1, 1, 2)
-        Grid.addWidget(InputText10, 7, 1)
-        Grid.addWidget(Input10, 7, 2)
-        # Pull and Hold
-        Grid.addWidget(Title1, 8, 1, 1, 2)
-        Grid.addWidget(InputText1, 9, 1)
-        Grid.addWidget(Input1, 9, 2)
-        Grid.addWidget(InputText2, 10, 1)
-        Grid.addWidget(Input2, 10, 2)
-        Grid.addWidget(InputText5, 11, 1)
-        Grid.addWidget(Input5, 11, 2)
-        Grid.addWidget(InputText6, 12, 1)
-        Grid.addWidget(Input6, 12, 2)
-        Grid.addWidget(self.StartPaHPCButton, 13, 1, 1, 2)
-        Grid.addWidget(self.StartPaHButton, 14, 1, 1, 2)
-        # Scratch Off
-        Grid.addWidget(Title2, 15, 1, 1, 2)
-        Grid.addWidget(InputText11, 16, 1)
-        Grid.addWidget(Input11, 16, 2)
-        Grid.addWidget(InputText12, 17, 1)
-        Grid.addWidget(Input12, 17, 2)
-        Grid.addWidget(InputText13, 18, 1)
-        Grid.addWidget(Input13, 18, 2)
-        Grid.addWidget(InputText14, 19, 1)
-        Grid.addWidget(Input14, 19, 2)
-        Grid.addWidget(InputText15, 20, 1)
-        Grid.addWidget(Input15, 21, 2)
-        Grid.addWidget(InputText16, 22, 1)
-        Grid.addWidget(Input16, 22, 2)
-        Grid.addWidget(Input17, 23, 2)
-        Grid.addWidget(self.StartSOButton, 24, 1, 1, 2)
+        Grid.addWidget(Title2, 17, 4, 1, 2)
+        Grid.addWidget(InputText11, 18, 4)
+        Grid.addWidget(Input11, 18, 5)
+        Grid.addWidget(InputText12, 19, 4)
+        Grid.addWidget(Input12, 19, 5)
+        Grid.addWidget(InputText13, 20, 4)
+        Grid.addWidget(Input13, 20, 5)
+        Grid.addWidget(InputText14, 21, 4)
+        Grid.addWidget(Input14, 21, 5)
+        Grid.addWidget(InputText15, 22, 4)
+        Grid.addWidget(Input15, 22, 5)
+        Grid.addWidget(InputText16, 23, 4)
+        Grid.addWidget(Input16, 23, 5)
+        Grid.addWidget(Input17, 24, 4, 1, 2)
+        Grid.addWidget(self.StartSOButton, 25, 4, 1, 2)
 
         self.Widget = PyWidgets.QWidget()
         self.Widget.setLayout(Grid)
@@ -625,39 +630,67 @@ class MainWindow(PyWidgets.QMainWindow):
         self.draw_geometry()
         self.initialize_scratch_off_points()
 
+    def start_calibration(self):
+        # Implement the calibration logic here
+        # This should involve loading the images, detecting positions, and calculating the transformation matrix
+        image_paths = [...]  # List of image paths for calibration
+        images = load_images(image_paths)
+        template = ...  # Load template image of the AFM head
+    
+        positions_image = [detect_afm_head(image, template) for image in images]
+        positions_afm = [...]  # Known AFM positions
+    
+        self.calibration_matrix = estimate_transformation(positions_image, positions_afm)
+        self.TransformSwitch.setChecked(False)
+        self.TransformSwitch.setEnabled(True)
+    
+    def switch_transformation(self, state):
+        if state == PyCore.Qt.Checked:
+            # Use model-based transformation
+            self.use_model_based_transformation = True
+        else:
+            # Use calibrated transformation if available
+            if self.calibration_matrix is not None:
+                self.use_model_based_transformation = False
+            else:
+                PyWidgets.QMessageBox.warning(self, 'Error', 'Calibration data not available. Reverting to model-based transformation.')
+                self.TransformSwitch.setChecked(True)
+
+
     def transform_coordinates_image2rl(self, InPoint):
-        # transform InPoint to np array
         InPoint = np.array(InPoint)
-
-        self.calculate_transformation_constants()
-
-        if InPoint.size == 1:
-            OutPoint = InPoint * self.Im2RlScalingVector[0]
-            return OutPoint
-
-        # shift InPoint to Origin
-        InPoint = InPoint - self.RlOriginInImage
-        # scale InPoint via SizePerPixel
-        OutPoint = InPoint * self.Im2RlScalingVector
+        if self.use_model_based_transformation:
+            self.calculate_transformation_constants()
+            if InPoint.size == 1:
+                OutPoint = InPoint * self.Im2RlScalingVector[0]
+                return OutPoint
+    
+            InPoint = InPoint - self.RlOriginInImage
+            OutPoint = InPoint * self.Im2RlScalingVector
+        else:
+            # Use calibrated transformation
+            OutPoint = transform_coordinates(InPoint, self.calibration_matrix)
 
         return OutPoint
 
     def transform_coordinates_rl2image(self, InPoint):
-        # transform InPoint to np array
         InPoint = np.array(InPoint)
-
-        self.calculate_transformation_constants()
-
-        if InPoint.size == 1:
-            OutPoint = InPoint * self.Rl2ImScalingVector[0]
-            return OutPoint
-
-        # shift InPoint to Origin
-        InPoint = InPoint - self.ImageOriginInRl
-        # scale InPoint via SizePerPixel
-        OutPoint = InPoint * self.Rl2ImScalingVector
+        if self.use_model_based_transformation:
+            self.calculate_transformation_constants()
+            if InPoint.size == 1:
+                OutPoint = InPoint * self.Rl2ImScalingVector[0]
+                return OutPoint
+    
+            InPoint = InPoint - self.ImageOriginInRl
+            OutPoint = InPoint * self.Rl2ImScalingVector
+        else:
+            # Use calibrated transformation
+            # Apply inverse of calibration matrix for reverse transformation
+            inv_calibration_matrix = np.linalg.inv(self.calibration_matrix)
+            OutPoint = transform_coordinates(InPoint, inv_calibration_matrix)
 
         return OutPoint
+
 
     def calculate_transformation_constants(self):
         self.Im2RlScalingVector = np.array([1, -1]) * self.PixelSize / self.Magnification
@@ -764,21 +797,22 @@ class MainWindow(PyWidgets.QMainWindow):
 
     def send_instructions_scratch_off(self, event):
         SOHoldingTime = '0'
-
+    
         InList = [['Scratch Off', str(self.RecordRealTimeScan), str(self.RecordVideo), str(self.RecordVideoNthFrame)]]
-
-        for i in enumerate(self.SOFinalStrainPoints):
+    
+        for i in range(len(self.SOFinalStrainPoints)):
             InList.append(
                 [str(self.SOBufferPoints[i][0]), str(self.SOBufferPoints[i][1]), str(self.PositioningVelocity), SOHoldingTime,
                  'Retracted'])
             InList.append(
                 [str(self.SOFinalStrainPoints[i][0]), str(self.SOFinalStrainPoints[i][1]), str(self.SOStrainRate), SOHoldingTime,
                  'Approached'])
-
+    
         InList.append([str(self.StartingTipPosition[0]), str(self.StartingTipPosition[1]), str(self.PositioningVelocity), SOHoldingTime,
                        'Retracted'])
-
+    
         Instructions = self.construct_and_send_instructions(InList)
+
 
     def construct_and_send_instructions(self, InList):
         Instructions = [self.InstructionStartString]
