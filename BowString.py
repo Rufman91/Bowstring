@@ -111,8 +111,34 @@ RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName):
     print('\nProcess complete. Waiting for new instructions...\n')
     
 
-def parse_and_execute_instructions(InList,TTLInstance,TargetDir,RootName):
-    
+def execute_calibration(Points, TTLInstance, RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TempDir, RootName):
+    # make sure piezo is retracted and get current position
+    Scanner.retractPiezo()
+    PiezoEngaged = False
+
+    if not os.path.exists(TempDir):
+        os.makedirs(TempDir)
+
+    for idx, P in enumerate(Points):
+        if P[4] == 'Approached' and not PiezoEngaged:
+            print('Approaching...')
+            Scanner.approach()
+            PiezoEngaged = True
+        elif P[4] == 'Retracted' and PiezoEngaged:
+            print('Retracting...')
+            Scanner.retractPiezo()
+            PiezoEngaged = False
+        xyScanner.moveToXYPosition(P[0], P[1], P[2])
+        if P[3] > 0:
+            time.sleep(P[3])
+        # Capture and save image
+        image_filename = os.path.join(TempDir, f"calibration_image_{idx}.jpg")
+        Snapshooter.saveOpticalSnapshot(image_filename)
+
+    print('\nCalibration complete. Waiting for new instructions...\n')
+
+
+def parse_and_execute_instructions(InList, TTLInstance, TargetDir, RootName):
     SplitList = []
     for S in InList:
         SplitList.append(S.split(';'))
@@ -120,49 +146,56 @@ def parse_and_execute_instructions(InList,TTLInstance,TargetDir,RootName):
     StartStringCounter = 0
     EndStringCounter = 0
     for S in SplitList:
-        if S[0]=='InstructionStart':
+        if S[0] == 'InstructionStart':
             StartStringCounter += 1
-        elif S[0]=='InstructionEnd':
-            EndStringCounter +=1
-    if not (StartStringCounter==1 and EndStringCounter==1):
-            print('Error: Instructions are faulty!')
-            return
+        elif S[0] == 'InstructionEnd':
+            EndStringCounter += 1
+    if not (StartStringCounter == 1 and EndStringCounter == 1):
+        print('Error: Instructions are faulty!')
+        return
     SplitList.pop(0)
     SplitList.pop(-1)
     ModeSettings = SplitList.pop(0)
     print(ModeSettings)
     Mode = ModeSettings[0]
-    if ModeSettings[1]=='True':
+    if ModeSettings[1] == 'True':
         RecordRealTimeScan = True
-    elif ModeSettings[1]=='False':
+    elif ModeSettings[1] == 'False':
         RecordRealTimeScan = False
     else:
         print('Error: Instructions are faulty!')
         return
-    if ModeSettings[2]=='True':
+    if ModeSettings[2] == 'True':
         RecordVideo = True
-    elif ModeSettings[2]=='False':
+    elif ModeSettings[2] == 'False':
         RecordVideo = False
     else:
         print('Error: Instructions are faulty!')
         return
     RecordVideoNthFrame = int(ModeSettings[3])
-    Points = []
-    
+    TempDir = ModeSettings[4] if Mode == 'Calibration' else None
+
     Points = []
     for S in SplitList:
-        P = [float(S[0]) , float(S[1]) , float(S[2]) , float(S[3]) , S[4]]
+        P = [float(S[0]), float(S[1]), float(S[2]), float(S[3]), S[4]]
         Points.append(P)
-    
-    if Mode=='PullAndHold':
-        execute_instruction_list(Points,TTLInstance,Mode,
-        RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName)
-    elif Mode=='PullAndHoldPositionCheck':
-        execute_instruction_list(Points,TTLInstance,Mode,
-        RecordRealTimeScan,RecordVideo,RecordVideoNthFrame,TargetDir,RootName)
+
+    if Mode == 'PullAndHold':
+        execute_instruction_list(Points, TTLInstance, Mode,
+                                 RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TargetDir, RootName)
+    elif Mode == 'PullAndHoldPositionCheck':
+        execute_instruction_list(Points, TTLInstance, Mode,
+                                 RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TargetDir, RootName)
+    elif Mode == 'Calibration':
+        execute_calibration(Points, TTLInstance,
+                            RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TempDir, RootName)
+    elif Mode == 'ScratchOff':
+        execute_instruction_list(Points, TTLInstance, Mode,
+                                 RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TargetDir, RootName)
     else:
         print('%s is not an available Bowstring-mode' % Mode)
     return
+
 
 
 #######################################################################

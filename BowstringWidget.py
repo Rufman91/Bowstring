@@ -10,10 +10,12 @@ import PyQt5.QtGui as PyGui
 import PyQt5.QtWidgets as PyWidgets
 import PyQt5.QtCore as PyCore
 import time
+import tempfile
+import shutil
 import sys
 import os
 import numpy as np
-from calibration import load_images, detect_afm_head, phase_correlation, estimate_transformation, transform_coordinates
+from calibration import load_images, phase_correlation, estimate_transformation, transform_coordinates
 
 
 class PaintPixmap(PyGui.QPixmap):
@@ -115,6 +117,11 @@ class MainWindow(PyWidgets.QMainWindow):
             self.StartingTipPosition = np.array([float(sys.argv[1]), float(sys.argv[2])])
             self.ImageFullFile = str(sys.argv[3])
 
+        # Set the window icon
+        icon_path = os.path.join(self.ProgramPath, 'icons', 'Bow.jpg')
+        self.setWindowIcon(PyGui.QIcon(icon_path))
+        
+        
         self.ImageFullFile = os.path.abspath(self.ImageFullFile)
         self.ImagePath = os.path.dirname(self.ImageFullFile)
 
@@ -192,7 +199,6 @@ class MainWindow(PyWidgets.QMainWindow):
         self.Image.setAlignment(PyCore.Qt.AlignHCenter | PyCore.Qt.AlignTop)
         self.Image.mousePressEvent = self.getPos
 
-        # New Calibration Section
         self.TitleFontSize = 16
         self.MaxEditLength = 10
 
@@ -223,6 +229,10 @@ class MainWindow(PyWidgets.QMainWindow):
         # Coordinate Transformation Calibration
         TitleCalibration = PyWidgets.QLabel('Coordinate Transformation Calibration')
         TitleCalibration.setFont(PyGui.QFont('Arial', self.TitleFontSize))
+        
+        # Model-based Transformation
+        TitleModelBased = PyWidgets.QLabel('Model-based Transformation')
+        TitleModelBased.setFont(PyGui.QFont('Arial', self.TitleFontSize - 2))
 
         InputText3 = PyWidgets.QLabel('Camera Pixel Size [um]:')
         Input3 = PyWidgets.QLineEdit('%.3f' % (self.PixelSize * 1e6))
@@ -236,13 +246,27 @@ class MainWindow(PyWidgets.QMainWindow):
         Input4.setValidator(PyGui.QDoubleValidator())
         Input4.textChanged.connect(self.set_magnification)
 
-        self.CalibrateButton = PyWidgets.QPushButton('Start Calibration')
-        self.CalibrateButton.clicked.connect(self.start_calibration)
-
         self.TransformSwitch = PyWidgets.QCheckBox('Use Model-Based Transformation')
         self.TransformSwitch.setChecked(True)
         self.TransformSwitch.stateChanged.connect(self.switch_transformation)
         self.TransformSwitch.setEnabled(False)  # Disabled initially
+
+        # Actual Calibration
+        TitleActualCalibration = PyWidgets.QLabel('Actual Calibration')
+        TitleActualCalibration.setFont(PyGui.QFont('Arial', self.TitleFontSize - 2))
+        
+        GridSizeLabel = PyWidgets.QLabel('Grid Size:')
+        self.GridSizeEdit = PyWidgets.QLineEdit('5')
+        self.GridSizeEdit.setMaxLength(4)
+        self.GridSizeEdit.setValidator(PyGui.QIntValidator())
+        
+        HoldingTimeLabel = PyWidgets.QLabel('Holding Time [s]:')
+        self.HoldingTimeEdit = PyWidgets.QLineEdit('1.0')
+        self.HoldingTimeEdit.setMaxLength(self.MaxEditLength)
+        self.HoldingTimeEdit.setValidator(PyGui.QDoubleValidator())
+
+        self.CalibrateButton = PyWidgets.QPushButton('Start Calibration')
+        self.CalibrateButton.clicked.connect(self.start_calibration)
 
         # Layout adjustments
         Spacing = 24
@@ -264,12 +288,22 @@ class MainWindow(PyWidgets.QMainWindow):
         
         # Coordinate Transformation Calibration
         Grid.addWidget(TitleCalibration, 5, 4, 1, 2)
-        Grid.addWidget(InputText3, 6, 4)
-        Grid.addWidget(Input3, 6, 5)
-        Grid.addWidget(InputText4, 7, 4)
-        Grid.addWidget(Input4, 7, 5)
-        Grid.addWidget(self.CalibrateButton, 8, 4, 1, 2)
+
+        # Model-based Transformation
+        Grid.addWidget(TitleModelBased, 6, 4, 1, 2)
+        Grid.addWidget(InputText3, 7, 4)
+        Grid.addWidget(Input3, 7, 5)
+        Grid.addWidget(InputText4, 8, 4)
+        Grid.addWidget(Input4, 8, 5)
         Grid.addWidget(self.TransformSwitch, 9, 4, 1, 2)
+
+        # Actual Calibration
+        Grid.addWidget(TitleActualCalibration, 10, 4, 1, 2)
+        Grid.addWidget(GridSizeLabel, 11, 4)
+        Grid.addWidget(self.GridSizeEdit, 11, 5)
+        Grid.addWidget(HoldingTimeLabel, 12, 4)
+        Grid.addWidget(self.HoldingTimeEdit, 12, 5)
+        Grid.addWidget(self.CalibrateButton, 13, 4, 1, 2)
 
         # Pull and Hold settings
         Title1 = PyWidgets.QLabel('Pull and Hold')
@@ -306,17 +340,17 @@ class MainWindow(PyWidgets.QMainWindow):
         self.StartPaHPCButton.mousePressEvent = self.send_instructions_pull_and_hold_position_check
         self.StartPaHPCButton.setEnabled(False)
 
-        Grid.addWidget(Title1, 10, 4, 1, 2)
-        Grid.addWidget(InputText1, 11, 4)
-        Grid.addWidget(Input1, 11, 5)
-        Grid.addWidget(InputText2, 12, 4)
-        Grid.addWidget(Input2, 12, 5)
-        Grid.addWidget(InputText5, 13, 4)
-        Grid.addWidget(Input5, 13, 5)
-        Grid.addWidget(InputText6, 14, 4)
-        Grid.addWidget(Input6, 14, 5)
-        Grid.addWidget(self.StartPaHPCButton, 15, 4, 1, 2)
-        Grid.addWidget(self.StartPaHButton, 16, 4, 1, 2)
+        Grid.addWidget(Title1, 0, 6, 1, 2)
+        Grid.addWidget(InputText1, 1, 6)
+        Grid.addWidget(Input1, 1, 7)
+        Grid.addWidget(InputText2, 2, 6)
+        Grid.addWidget(Input2, 2, 7)
+        Grid.addWidget(InputText5, 3, 6)
+        Grid.addWidget(Input5, 3, 7)
+        Grid.addWidget(InputText6, 4, 6)
+        Grid.addWidget(Input6, 4, 7)
+        Grid.addWidget(self.StartPaHPCButton, 5, 6, 1, 2)
+        Grid.addWidget(self.StartPaHButton, 6, 6, 1, 2)
         
         # Scratch Off settings
         Title2 = PyWidgets.QLabel('Scratch Off')
@@ -365,21 +399,21 @@ class MainWindow(PyWidgets.QMainWindow):
         self.StartSOButton.mousePressEvent = self.send_instructions_scratch_off
         self.StartSOButton.setEnabled(False)
 
-        Grid.addWidget(Title2, 17, 4, 1, 2)
-        Grid.addWidget(InputText11, 18, 4)
-        Grid.addWidget(Input11, 18, 5)
-        Grid.addWidget(InputText12, 19, 4)
-        Grid.addWidget(Input12, 19, 5)
-        Grid.addWidget(InputText13, 20, 4)
-        Grid.addWidget(Input13, 20, 5)
-        Grid.addWidget(InputText14, 21, 4)
-        Grid.addWidget(Input14, 21, 5)
-        Grid.addWidget(InputText15, 22, 4)
-        Grid.addWidget(Input15, 22, 5)
-        Grid.addWidget(InputText16, 23, 4)
-        Grid.addWidget(Input16, 23, 5)
-        Grid.addWidget(Input17, 24, 4, 1, 2)
-        Grid.addWidget(self.StartSOButton, 25, 4, 1, 2)
+        Grid.addWidget(Title2, 7, 6, 1, 2)
+        Grid.addWidget(InputText11, 8, 6)
+        Grid.addWidget(Input11, 8, 7)
+        Grid.addWidget(InputText12, 9, 6)
+        Grid.addWidget(Input12, 9, 7)
+        Grid.addWidget(InputText13, 10, 6)
+        Grid.addWidget(Input13, 10, 7)
+        Grid.addWidget(InputText14, 11, 6)
+        Grid.addWidget(Input14, 11, 7)
+        Grid.addWidget(InputText15, 12, 6)
+        Grid.addWidget(Input15, 12, 7)
+        Grid.addWidget(InputText16, 13, 6)
+        Grid.addWidget(Input16, 13, 7)
+        Grid.addWidget(Input17, 14, 6, 1, 2)
+        Grid.addWidget(self.StartSOButton, 15, 6, 1, 2)
 
         self.Widget = PyWidgets.QWidget()
         self.Widget.setLayout(Grid)
@@ -392,16 +426,93 @@ class MainWindow(PyWidgets.QMainWindow):
         screenHeight = screen.height()
 
         # Set window size to 80% of the screen size
-        self.setGeometry(100, 100, screenWidth * 0.8, screenHeight * 0.8)
+        self.setGeometry(100, 100, int(screenWidth * 0.8), int(screenHeight * 0.8))
 
         # Set the minimum size if necessary (could be smaller)
-        self.setMinimumSize(screenWidth * 0.5, screenHeight * 0.5)
+        self.setMinimumSize(int(screenWidth * 0.5), int(screenHeight * 0.5))
         
         self.setAcceptDrops(True)
         self.setWindowTitle('Bowstring')
         # self.setGeometry(200, 200, 300, 600)
         self.show()
         
+
+
+
+    def start_calibration(self):
+        # Retrieve input values
+        grid_size = int(self.GridSizeEdit.text())
+        holding_time = float(self.HoldingTimeEdit.text())
+        positioning_velocity = self.PositioningVelocity
+    
+        # Define movement boundaries
+        lower_bound = self.LowerPiezoRange
+        upper_bound = self.UpperPiezoRange
+    
+        # Calculate grid points
+        x_positions = np.linspace(lower_bound, upper_bound, grid_size)
+        y_positions = np.linspace(lower_bound, upper_bound, grid_size)
+    
+        # Create temporary folder for snapshots
+        temp_dir = tempfile.mkdtemp()
+        self.calibration_temp_dir = temp_dir
+    
+        # Compile instruction list
+        instruction_list = [['Calibration', str(False), str(False), str(self.RecordVideoNthFrame), temp_dir]]
+        afm_positions = []
+        for x in x_positions:
+            for y in y_positions:
+                afm_positions.append([x, y])
+                instruction_list.append([
+                    str(x), str(y), str(positioning_velocity), str(holding_time), 'Retracted'
+                ])
+    
+        # Store afm_positions for later use
+        self.afm_positions = afm_positions
+    
+        # Send instruction list to the second script
+        self.construct_and_send_instructions(instruction_list)
+    
+        # Wait for the required number of images
+        required_images = grid_size * grid_size
+        self.wait_for_images(temp_dir, required_images)
+    
+    def wait_for_images(self, folder, num_images):
+        while True:
+            files = os.listdir(folder)
+            if len(files) >= num_images:
+                break
+            time.sleep(1)  # Check every second
+    
+        # Proceed with the next steps after all images are present
+        self.process_calibration_images(folder)
+
+    
+    def process_calibration_images(self, folder):
+        # Load images and associate them with AFM positions
+        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder))]
+        images = load_images(image_paths)
+    
+        # Get the pre-defined AFM positions from start_calibration
+        positions_afm = self.afm_positions
+    
+        # Use phase correlation to determine relative positions between images
+        positions_image = [self.StartingTipPosition]  # Start with the first known position
+    
+        for i in range(1, len(images)):
+            shift = phase_correlation(images[0], images[i])
+            new_position = (self.StartingTipPosition[0] + shift[0], self.StartingTipPosition[1] + shift[1])
+            positions_image.append(new_position)
+    
+        # Estimate the transformation matrix
+        self.calibration_matrix = estimate_transformation(positions_image, positions_afm)
+        self.TransformSwitch.setChecked(False)
+        self.TransformSwitch.setEnabled(True)
+    
+        # Clean up temporary folder
+        shutil.rmtree(folder)
+
+
 
     def initialize_scratch_off_points(self):
         
@@ -630,19 +741,6 @@ class MainWindow(PyWidgets.QMainWindow):
         self.draw_geometry()
         self.initialize_scratch_off_points()
 
-    def start_calibration(self):
-        # Implement the calibration logic here
-        # This should involve loading the images, detecting positions, and calculating the transformation matrix
-        image_paths = [...]  # List of image paths for calibration
-        images = load_images(image_paths)
-        template = ...  # Load template image of the AFM head
-    
-        positions_image = [detect_afm_head(image, template) for image in images]
-        positions_afm = [...]  # Known AFM positions
-    
-        self.calibration_matrix = estimate_transformation(positions_image, positions_afm)
-        self.TransformSwitch.setChecked(False)
-        self.TransformSwitch.setEnabled(True)
     
     def switch_transformation(self, state):
         if state == PyCore.Qt.Checked:
