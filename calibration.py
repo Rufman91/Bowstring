@@ -9,12 +9,66 @@ def load_images(image_paths):
             images.append(image)
     return images
 
-def phase_correlation(image1, image2):
-    image1_gray = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-    image2_gray = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
 
+def preprocess_image(image):
+    # Convert to grayscale
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Step 1: Negate the image
+    negated_image = cv2.bitwise_not(gray_image)
+    
+    # Step 2: Apply binary thresholding
+    _, binary_image = cv2.threshold(negated_image, 200, 255, cv2.THRESH_BINARY)
+    
+    # Step 3: Remove small objects using morphological operations
+    kernel = np.ones((5, 5), np.uint8)
+    opened_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel)
+    
+    # Step 4: Find the largest connected component
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(opened_image, connectivity=8)
+    largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])  # Ignore the background
+    
+    mask = np.zeros_like(labels, dtype=np.uint8)
+    mask[labels == largest_label] = 255
+    
+    # Step 5: Return the cleaned-up binary image
+    cleaned_image = cv2.bitwise_and(binary_image, binary_image, mask=mask)
+    
+    return cleaned_image
+
+
+def phase_correlation(image1, image2):
+    # Preprocess images to isolate the cantilever
+    image1_preprocessed = preprocess_image(image1)
+    image2_preprocessed = preprocess_image(image2)
+    
+    # Since preprocess_image already returns grayscale images, no need for additional conversion
+    image1_gray = image1_preprocessed
+    image2_gray = image2_preprocessed
+
+    # Compute the phase correlation
     shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
+    
+    
+    # Switch the indexing of the shifts
+    shift = (-shift[1], -shift[0])
+    
     return shift
+
+
+
+# def phase_correlation(image1, image2):
+    
+#     # Apply Gaussian blur to reduce high-frequency noise
+#     image1_blur = cv2.GaussianBlur(image1, (51, 51), 0)
+#     image2_blur = cv2.GaussianBlur(image2, (51, 51), 0)
+    
+    
+#     image1_gray = cv2.cvtColor(image1_blur, cv2.COLOR_BGR2GRAY)
+#     image2_gray = cv2.cvtColor(image2_blur, cv2.COLOR_BGR2GRAY)
+
+#     shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
+#     return shift
 
 def estimate_transformation(points_image, points_afm):
     transformation_matrix, inliers = cv2.estimateAffine2D(np.array(points_image), np.array(points_afm))

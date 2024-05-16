@@ -15,7 +15,9 @@ import shutil
 import sys
 import os
 import numpy as np
-from calibration import load_images, phase_correlation, estimate_transformation, transform_coordinates
+from calibration import load_images, phase_correlation, estimate_transformation, transform_coordinates, preprocess_image
+import cv2
+import matplotlib.pyplot as plt
 
 
 class PaintPixmap(PyGui.QPixmap):
@@ -110,8 +112,10 @@ class MainWindow(PyWidgets.QMainWindow):
         FullPath = os.path.abspath(str(sys.argv[0]))
         self.ProgramPath = os.path.dirname(FullPath)
 
+        self.DebugMode = True
+
         if len(sys.argv) < 2:
-            self.StartingTipPosition = [4.999e-5, 4.999e-5]
+            self.StartingTipPosition = [4.99999e-5, 4.99999e-5]
             self.ImageFullFile = os.path.join(self.ProgramPath, 'TestImage.tif')
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]), float(sys.argv[2])])
@@ -438,8 +442,236 @@ class MainWindow(PyWidgets.QMainWindow):
         
 
 
-
     def start_calibration(self):
+        if self.DebugMode:
+            self.start_calibration_debug()
+        else:
+            self.start_calibration_standard()
+
+########## DEBUG CODE #############
+
+    def visualize_images(self, image1, image2):
+        import matplotlib.pyplot as plt
+        
+        image1 = preprocess_image(image1)
+        image2 = preprocess_image(image2)
+        
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        axs[0].imshow(cv2.cvtColor(image1, cv2.COLOR_BGR2RGB))
+        axs[0].set_title("Reference Image")
+        axs[0].axis('off')
+        
+        axs[1].imshow(cv2.cvtColor(image2, cv2.COLOR_BGR2RGB))
+        axs[1].set_title("Target Image")
+        axs[1].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def visualize_shift(self, image1, image2, shift):
+        import matplotlib.pyplot as plt
+    
+        # image1 = preprocess_image(image1)
+        # image2 = preprocess_image(image2)
+        
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.imshow(cv2.cvtColor(image1, cv2.COLOR_BGR2RGB))
+        ax.set_title(f"Shift: {shift}")
+        ax.axis('off')
+    
+        # Overlay the second image with the shift applied
+        shifted_image2 = np.roll(image2, shift.astype(int), axis=(0, 1))
+        ax.imshow(cv2.cvtColor(shifted_image2, cv2.COLOR_BGR2RGB), alpha=0.5)
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def visualize_frequency_domain(self, image1, image2):
+        import matplotlib.pyplot as plt
+        
+        # Preprocess images to isolate the cantilever
+        image1_preprocessed = preprocess_image(image1)
+        image2_preprocessed = preprocess_image(image2)
+        
+        # Since preprocess_image already returns grayscale images, no need for additional conversion
+        image1_gray = image1_preprocessed
+        image2_gray = image2_preprocessed
+        
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        axs[0].imshow(np.log(np.abs(image1_gray) + 1), cmap='gray')
+        axs[0].set_title("Reference Image Frequency Domain")
+        axs[0].axis('off')
+    
+        axs[1].imshow(np.log(np.abs(image2_gray) + 1), cmap='gray')
+        axs[1].set_title("Target Image Frequency Domain")
+        axs[1].axis('off')
+    
+        plt.tight_layout()
+        plt.show()
+        
+    def visualize_correlation_image(self, image1, image2):
+
+
+        # Preprocess images to isolate the cantilever
+        image1_preprocessed = preprocess_image(image1)
+        image2_preprocessed = preprocess_image(image2)
+    
+        # Since preprocess_image already returns grayscale images, no need for additional conversion
+        image1_gray = image1_preprocessed
+        image2_gray = image2_preprocessed
+
+        f_image1 = np.fft.fft2(image1_gray)
+        f_image2 = np.fft.fft2(image2_gray)
+
+        cross_power_spectrum = (f_image1 * np.conj(f_image2)) / np.abs(f_image1 * np.conj(f_image2))
+        correlation_image = np.fft.ifft2(cross_power_spectrum)
+        correlation_image = np.fft.fftshift(correlation_image)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.imshow(np.log(np.abs(correlation_image)), cmap='gray')
+        ax.set_title("Phase Correlation Image")
+        ax.axis('off')
+
+        plt.tight_layout()
+        plt.show()
+    
+    def start_calibration_debug(self):
+        import matplotlib.pyplot as plt
+    
+        # Fixed input values for debugging
+        grid_size = 5
+        holding_time = 1.0  # seconds
+        positioning_velocity = self.PositioningVelocity
+    
+        # Define movement boundaries (for visual representation)
+        lower_bound = self.LowerPiezoRange
+        upper_bound = self.UpperPiezoRange
+    
+        # Calculate grid points
+        x_positions = np.linspace(lower_bound, upper_bound, grid_size)
+        y_positions = np.linspace(lower_bound, upper_bound, grid_size)
+    
+        # Fixed folder path for debugging
+        debug_folder = "/home/manuel/RawData/2024_05_16_BowstringCoordCalibTestdataset/tmpjefj5cif"
+        if not os.path.exists(debug_folder):
+            print(f"Debug folder does not exist: {debug_folder}")
+            return
+    
+        # Assume a fixed number of images in the folder
+        expected_num_images = grid_size * grid_size
+        image_paths = [os.path.join(debug_folder, f"calibration_image_{i}.jpg") for i in range(expected_num_images)]
+        if len(image_paths) != expected_num_images:
+            print(f"Expected {expected_num_images} images, but found {len(image_paths)}")
+            return
+    
+        images = [cv2.imread(path) for path in image_paths]
+        if any(img is None for img in images):
+            print("One or more images could not be loaded.")
+            return
+    
+        fig, axs = plt.subplots(grid_size, grid_size, figsize=(10, 10))
+        for i, ax in enumerate(axs.flatten()):
+            x_idx = i % grid_size
+            y_idx = i // grid_size
+            ax.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
+            ax.set_title(f"({x_positions[x_idx]:.2e}, {y_positions[y_idx]:.2e})")
+            ax.axis('off')
+        plt.tight_layout()
+        plt.show()
+    
+        self.afm_positions = [(x, y) for x in x_positions for y in y_positions]
+        self.images = images
+    
+        # Perform phase correlation and visualize results
+        shifts = []
+        for i in range(1, len(images)):
+            self.visualize_images(images[0], images[i])
+            shift = phase_correlation(images[0], images[i])
+            shifts.append(shift)
+            print(f"Shift for image {i}: {shift}")
+            self.visualize_shift(images[0], images[i], np.array(shift))
+            self.visualize_frequency_domain(images[0], images[i])
+            self.visualize_correlation_image(images[0], images[i])
+            self.visualize_phase_correlation(images[0], images[i])
+            
+    
+        # Plot phase correlation results
+        self.plot_phase_correlation_results(images[0], shifts, grid_size)
+    
+        # Estimate transformation matrix
+        self.calibration_matrix = estimate_transformation(shifts, self.afm_positions[1:])
+        print("Estimated transformation matrix:", self.calibration_matrix)
+    
+        # Plot transformed grid
+        self.plot_transformed_grid(images[0], self.calibration_matrix, x_positions, y_positions)
+    
+        print("Debug: Calibration process completed successfully.")
+
+    def visualize_phase_correlation(self,image1, image2):
+        image1_preprocessed = preprocess_image(image1)
+        image2_preprocessed = preprocess_image(image2)
+        
+        image1_gray = image1_preprocessed
+        image2_gray = image2_preprocessed
+    
+        # Compute the phase correlation
+        shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
+        
+        # Compute the cross power spectrum and its inverse for visualization
+        dft1 = cv2.dft(np.float32(image1_gray), flags=cv2.DFT_COMPLEX_OUTPUT)
+        dft2 = cv2.dft(np.float32(image2_gray), flags=cv2.DFT_COMPLEX_OUTPUT)
+        
+        conj_b = np.conj(dft2)
+        dft_product = dft1 * conj_b
+        cross_power_spectrum = dft_product / np.abs(dft_product)
+        
+        phase_correlation_image = cv2.idft(cross_power_spectrum, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)
+        phase_correlation_image = np.fft.fftshift(phase_correlation_image)
+    
+        plt.figure(figsize=(10, 5))
+    
+        plt.subplot(1, 2, 1)
+        plt.imshow(image1_gray, cmap='gray')
+        plt.title('Reference Image')
+    
+        plt.subplot(1, 2, 2)
+        plt.imshow(image2_gray, cmap='gray')
+        plt.title('Target Image')
+    
+        plt.figure(figsize=(6, 6))
+        plt.imshow(phase_correlation_image, cmap='gray')
+        plt.title(f'Phase Correlation Image\nShift: {shift}')
+        plt.show()
+
+
+    def plot_phase_correlation_results(self, reference_image, shifts, grid_size):
+        fig, axs = plt.subplots(grid_size, grid_size, figsize=(10, 10))
+        axs[0, 0].imshow(cv2.cvtColor(reference_image, cv2.COLOR_BGR2RGB))
+        axs[0, 0].set_title("Reference Image")
+        axs[0, 0].axis('off')
+
+        for i, shift in enumerate(shifts, 1):
+            x_idx = i % grid_size
+            y_idx = i // grid_size
+            axs[y_idx, x_idx].imshow(cv2.cvtColor(reference_image, cv2.COLOR_BGR2RGB))
+            axs[y_idx, x_idx].set_title(f"Shift: {shift}")
+            axs[y_idx, x_idx].axis('off')
+        plt.tight_layout()
+        plt.show()
+
+    def plot_transformed_grid(self, reference_image, transformation_matrix, x_positions, y_positions):
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.imshow(cv2.cvtColor(reference_image, cv2.COLOR_BGR2RGB))
+        for x in x_positions:
+            for y in y_positions:
+                transformed_point = transform_coordinates((x, y), transformation_matrix)
+                ax.plot(transformed_point[0], transformed_point[1], 'ro')
+        plt.show()
+
+
+###################################
+
+    def start_calibration_standard(self):
         # Retrieve input values
         grid_size = int(self.GridSizeEdit.text())
         holding_time = float(self.HoldingTimeEdit.text())
