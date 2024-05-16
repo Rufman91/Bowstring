@@ -132,7 +132,7 @@ def execute_calibration(Points, TTLInstance, RecordRealTimeScan, RecordVideo, Re
         if P[3] > 0:
             time.sleep(P[3])
         # Capture and save image
-        image_filename = os.path.join(TempDir, f"calibration_image_{idx}.jpg")
+        image_filename = os.path.join(TempDir, "calibration_image_" + str(idx) + ".jpg")
         Snapshooter.saveOpticalSnapshot(image_filename)
 
     print('\nCalibration complete. Waiting for new instructions...\n')
@@ -189,7 +189,7 @@ def parse_and_execute_instructions(InList, TTLInstance, TargetDir, RootName):
     elif Mode == 'Calibration':
         execute_calibration(Points, TTLInstance,
                             RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TempDir, RootName)
-    elif Mode == 'ScratchOff':
+    elif Mode == 'Scratch Off':
         execute_instruction_list(Points, TTLInstance, Mode,
                                  RecordRealTimeScan, RecordVideo, RecordVideoNthFrame, TargetDir, RootName)
     else:
