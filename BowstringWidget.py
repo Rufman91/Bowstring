@@ -849,7 +849,7 @@ class MainWindow(PyWidgets.QMainWindow):
         # Use saved shifts and AFM positions to recalculate transformation matrix
         transshifts = [(shift[0] + self.Points[2][0], shift[1] + self.Points[2][1]) for shift in self.calibration_phasecorr_shifts]
         self.calibration_matrix = estimate_transformation(transshifts, self.afm_positions)
-        print("Recalculated transformation matrix:", self.calibration_matrix)
+        # print("Recalculated transformation matrix:", self.calibration_matrix)
 
     def getPos(self, event):
         x = event.pos().x()
