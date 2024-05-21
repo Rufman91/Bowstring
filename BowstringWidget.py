@@ -70,10 +70,14 @@ class PaintPixmap(PyGui.QPixmap):
                 painter.drawLine(p31, p32)
                 painter.drawLine(p41, p42)
         elif PaintedObject == 'Accessible Area':
-            Rectangle = PyCore.QRect(Points[0], Points[1])
+            # Rectangle = PyCore.QRect(Points[0], Points[1])
             painter.setPen(PyGui.QPen(PyCore.Qt.cyan, 4))
             painter.setRenderHint(PyGui.QPainter.Antialiasing)
-            painter.drawRect(Rectangle)
+            # painter.drawRect(Rectangle)
+            painter.drawLine(FPoints[0], FPoints[1])
+            painter.drawLine(FPoints[1], FPoints[2])
+            painter.drawLine(FPoints[2], FPoints[3])
+            painter.drawLine(FPoints[3], FPoints[0])
         elif PaintedObject == 'Bowstring Geometry':
             painter.setPen(PyGui.QPen(PyCore.Qt.green, 2))
             painter.setRenderHint(PyGui.QPainter.Antialiasing)
@@ -115,8 +119,8 @@ class MainWindow(PyWidgets.QMainWindow):
         self.DebugMode = True
 
         if len(sys.argv) < 2:
-            self.StartingTipPosition = [4.99999e-5, 4.99999e-5]
-            self.ImageFullFile = os.path.join(self.ProgramPath, 'TestImage.tif')
+            self.StartingTipPosition = [4.999999e-5, 4.999999e-5]
+            self.ImageFullFile = os.path.join(self.ProgramPath, 'TestImage.jpg')
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]), float(sys.argv[2])])
             self.ImageFullFile = str(sys.argv[3])
@@ -132,8 +136,8 @@ class MainWindow(PyWidgets.QMainWindow):
         self.InstructionStartString = 'InstructionStart'
         self.InstructionEndString = 'InstructionEnd'
 
-        self.UpperPiezoRange = 4.999e-5
-        self.LowerPiezoRange = -4.999e-5
+        self.UpperPiezoRange = 4.999999e-5
+        self.LowerPiezoRange = -4.999999e-5
 
         # General settings
         self.PositioningVelocity = float(1e-5)
@@ -147,6 +151,9 @@ class MainWindow(PyWidgets.QMainWindow):
         self.Magnification = float(10)
         self.calibration_matrix = None
         self.use_model_based_transformation = True
+        self.calibration_phasecorr_shifts = []
+        # Load the initial image as reference
+        self.reference_image = cv2.imread(self.ImageFullFile, cv2.IMREAD_COLOR)
 
         self.PointCounter = 0
         self.Points = list()
@@ -255,8 +262,8 @@ class MainWindow(PyWidgets.QMainWindow):
         self.TransformSwitch.stateChanged.connect(self.switch_transformation)
         self.TransformSwitch.setEnabled(False)  # Disabled initially
 
-        # Actual Calibration
-        TitleActualCalibration = PyWidgets.QLabel('Actual Calibration')
+        # PhaseCorr. Calibration
+        TitleActualCalibration = PyWidgets.QLabel('PhaseCorr. Calibration')
         TitleActualCalibration.setFont(PyGui.QFont('Arial', self.TitleFontSize - 2))
         
         GridSizeLabel = PyWidgets.QLabel('Grid Size:')
@@ -301,7 +308,7 @@ class MainWindow(PyWidgets.QMainWindow):
         Grid.addWidget(Input4, 8, 5)
         Grid.addWidget(self.TransformSwitch, 9, 4, 1, 2)
 
-        # Actual Calibration
+        # PhaseCorr. Calibration
         Grid.addWidget(TitleActualCalibration, 10, 4, 1, 2)
         Grid.addWidget(GridSizeLabel, 11, 4)
         Grid.addWidget(self.GridSizeEdit, 11, 5)
@@ -489,7 +496,8 @@ class MainWindow(PyWidgets.QMainWindow):
     def visualize_frequency_domain(self, image1, image2):
         import matplotlib.pyplot as plt
         
-        # Preprocess images to isolate the cantilever
+        # Preprocess images toer):
+        print(f"Debug folder does not  isolate the cantilever")
         image1_preprocessed = preprocess_image(image1)
         image2_preprocessed = preprocess_image(image2)
         
@@ -535,78 +543,6 @@ class MainWindow(PyWidgets.QMainWindow):
         plt.tight_layout()
         plt.show()
     
-    def start_calibration_debug(self):
-        import matplotlib.pyplot as plt
-    
-        # Fixed input values for debugging
-        grid_size = 5
-        holding_time = 1.0  # seconds
-        positioning_velocity = self.PositioningVelocity
-    
-        # Define movement boundaries (for visual representation)
-        lower_bound = self.LowerPiezoRange
-        upper_bound = self.UpperPiezoRange
-    
-        # Calculate grid points
-        x_positions = np.linspace(lower_bound, upper_bound, grid_size)
-        y_positions = np.linspace(lower_bound, upper_bound, grid_size)
-    
-        # Fixed folder path for debugging
-        debug_folder = "/home/manuel/RawData/2024_05_16_BowstringCoordCalibTestdataset/tmpjefj5cif"
-        if not os.path.exists(debug_folder):
-            print(f"Debug folder does not exist: {debug_folder}")
-            return
-    
-        # Assume a fixed number of images in the folder
-        expected_num_images = grid_size * grid_size
-        image_paths = [os.path.join(debug_folder, f"calibration_image_{i}.jpg") for i in range(expected_num_images)]
-        if len(image_paths) != expected_num_images:
-            print(f"Expected {expected_num_images} images, but found {len(image_paths)}")
-            return
-    
-        images = [cv2.imread(path) for path in image_paths]
-        if any(img is None for img in images):
-            print("One or more images could not be loaded.")
-            return
-    
-        fig, axs = plt.subplots(grid_size, grid_size, figsize=(10, 10))
-        for i, ax in enumerate(axs.flatten()):
-            x_idx = i % grid_size
-            y_idx = i // grid_size
-            ax.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
-            ax.set_title(f"({x_positions[x_idx]:.2e}, {y_positions[y_idx]:.2e})")
-            ax.axis('off')
-        plt.tight_layout()
-        plt.show()
-    
-        self.afm_positions = [(x, y) for x in x_positions for y in y_positions]
-        self.images = images
-    
-        # Perform phase correlation and visualize results
-        shifts = []
-        for i in range(1, len(images)):
-            self.visualize_images(images[0], images[i])
-            shift = phase_correlation(images[0], images[i])
-            shifts.append(shift)
-            print(f"Shift for image {i}: {shift}")
-            self.visualize_shift(images[0], images[i], np.array(shift))
-            self.visualize_frequency_domain(images[0], images[i])
-            self.visualize_correlation_image(images[0], images[i])
-            self.visualize_phase_correlation(images[0], images[i])
-            
-    
-        # Plot phase correlation results
-        self.plot_phase_correlation_results(images[0], shifts, grid_size)
-    
-        # Estimate transformation matrix
-        self.calibration_matrix = estimate_transformation(shifts, self.afm_positions[1:])
-        print("Estimated transformation matrix:", self.calibration_matrix)
-    
-        # Plot transformed grid
-        self.plot_transformed_grid(images[0], self.calibration_matrix, x_positions, y_positions)
-    
-        print("Debug: Calibration process completed successfully.")
-
     def visualize_phase_correlation(self,image1, image2):
         image1_preprocessed = preprocess_image(image1)
         image2_preprocessed = preprocess_image(image2)
@@ -669,6 +605,91 @@ class MainWindow(PyWidgets.QMainWindow):
         plt.show()
 
 
+    def start_calibration_debug(self):
+        import matplotlib.pyplot as plt
+    
+        # Load the initial image as reference
+        self.reference_image = cv2.imread(self.ImageFullFile, cv2.IMREAD_COLOR)
+        # Fixed input values for debugging
+        grid_size = 5
+        holding_time = 1.0  # seconds
+        positioning_velocity = self.PositioningVelocity
+    
+        # Define movement boundaries (for visual representation)
+        lower_bound = self.LowerPiezoRange
+        upper_bound = self.UpperPiezoRange
+    
+        # Calculate grid points
+        x_positions = np.linspace(lower_bound, upper_bound, grid_size)
+        y_positions = np.linspace(lower_bound, upper_bound, grid_size)
+    
+        # Fixed folder path for debugging
+        debug_folder = "/home/manuel/RawData/2024_05_16_BowstringCoordCalibTestdataset/tmpjefj5cif"
+        if not os.path.exists(debug_folder):
+            print(f"Debug folder does not exist: {debug_folder}")
+            return
+    
+        # Assume a fixed number of images in the folder
+        expected_num_images = grid_size * grid_size
+        image_paths = [os.path.join(debug_folder, f"calibration_image_{i}.jpg") for i in range(expected_num_images)]
+        if len(image_paths) != expected_num_images:
+            print(f"Expected {expected_num_images} images, but found {len(image_paths)}")
+            return
+    
+        images = [cv2.imread(path) for path in image_paths]
+        if any(img is None for img in images):
+            print("One or more images could not be loaded.")
+            return
+    
+        fig, axs = plt.subplots(grid_size, grid_size, figsize=(10, 10))
+        for i, ax in enumerate(axs.flatten()):
+            x_idx = i % grid_size
+            y_idx = i // grid_size
+            ax.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
+            ax.set_title(f"({x_positions[x_idx]:.2e}, {y_positions[y_idx]:.2e})")
+            ax.axis('off')
+        plt.tight_layout()
+        plt.show()
+    
+        self.afm_positions = [(x, y) for x in x_positions for y in y_positions]
+        self.images = images
+    
+        # Perform phase correlation and visualize results
+        shifts = []
+        transshifts = []
+        for i in range(len(images)):
+            self.visualize_images(self.reference_image, images[i])
+            shift = phase_correlation(self.reference_image, images[i])
+            shifts.append(shift)
+            transshifts.append((shift[0] + self.Points[2][0] , shift[1] + self.Points[2][1]))
+            print(f"Shift for image {i}: {shift}")
+            self.visualize_shift(self.reference_image, images[i], np.array(shift))
+            self.visualize_frequency_domain(self.reference_image, images[i])
+            self.visualize_correlation_image(self.reference_image, images[i])
+            self.visualize_phase_correlation(self.reference_image, images[i])
+            
+        self.calibration_phasecorr_shifts = shifts
+        # Plot phase correlation results
+        # self.plot_phase_correlation_results(self.reference_image, shifts, grid_size)
+    
+    
+        # Plot transformed grid
+        # self.plot_transformed_grid(self.reference_image, self.calibration_matrix, x_positions, y_positions)
+    
+        self.use_model_based_transformation = False
+        
+        # Estimate transformation matrix
+        self.recalculate_transformation_matrix()
+        print("Estimated transformation matrix:", self.calibration_matrix)
+        
+        self.TransformSwitch.setChecked(False)
+        self.TransformSwitch.setEnabled(True)
+        
+        self.draw_geometry()
+        self.initialize_scratch_off_points()
+    
+        print("Debug: Calibration process completed successfully.")
+
 ###################################
 
     def start_calibration_standard(self):
@@ -685,7 +706,6 @@ class MainWindow(PyWidgets.QMainWindow):
         x_positions = np.linspace(lower_bound, upper_bound, grid_size)
         y_positions = np.linspace(lower_bound, upper_bound, grid_size)
     
-        # Create temporary folder for snapshots
         temp_dir = tempfile.mkdtemp()
         self.calibration_temp_dir = temp_dir
     
@@ -725,21 +745,25 @@ class MainWindow(PyWidgets.QMainWindow):
         image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder))]
         images = load_images(image_paths)
     
-        # Get the pre-defined AFM positions from start_calibration
-        positions_afm = self.afm_positions
+        # Perform phase correlation
+        shifts = []
+        for i in range(len(images)):
+            shift = phase_correlation(self.reference_image, images[i])
+            shifts.append(shift)
+            
+        self.calibration_phasecorr_shifts = shifts
     
-        # Use phase correlation to determine relative positions between images
-        positions_image = [self.StartingTipPosition]  # Start with the first known position
-    
-        for i in range(1, len(images)):
-            shift = phase_correlation(images[0], images[i])
-            new_position = (self.StartingTipPosition[0] + shift[0], self.StartingTipPosition[1] + shift[1])
-            positions_image.append(new_position)
-    
-        # Estimate the transformation matrix
-        self.calibration_matrix = estimate_transformation(positions_image, positions_afm)
+        self.use_model_based_transformation = False
+        
+        # Estimate transformation matrix
+        self.recalculate_transformation_matrix()
+        # print("Estimated transformation matrix:", self.calibration_matrix)
+        
         self.TransformSwitch.setChecked(False)
         self.TransformSwitch.setEnabled(True)
+        
+        self.draw_geometry()
+        self.initialize_scratch_off_points()
     
         # Clean up temporary folder
         shutil.rmtree(folder)
@@ -818,6 +842,15 @@ class MainWindow(PyWidgets.QMainWindow):
             self.Pixmap.paintEvent(points, 'Scratch-Off Geometry')  # This assumes your paintEvent can handle this new type
             self.Image.setPixmap(self.Pixmap)
 
+    def recalculate_transformation_matrix(self):
+        if len(self.Points) < 3 or self.use_model_based_transformation:
+            return  # Not enough points to calculate the transformation matrix
+
+        # Use saved shifts and AFM positions to recalculate transformation matrix
+        transshifts = [(shift[0] + self.Points[2][0], shift[1] + self.Points[2][1]) for shift in self.calibration_phasecorr_shifts]
+        self.calibration_matrix = estimate_transformation(transshifts, self.afm_positions)
+        print("Recalculated transformation matrix:", self.calibration_matrix)
+
     def getPos(self, event):
         x = event.pos().x()
         y = event.pos().y()
@@ -827,6 +860,7 @@ class MainWindow(PyWidgets.QMainWindow):
             self.Points = list()
         self.PointCounter += 1
         self.ImageDescription.setText(self.ImageDescriptionPrompts[self.PointCounter])
+        self.recalculate_transformation_matrix()  # Recalculate transformation matrix
         self.draw_geometry()
         self.initialize_scratch_off_points()
 
@@ -888,6 +922,8 @@ class MainWindow(PyWidgets.QMainWindow):
         if not s or s == '':
             self.set_holding_time('0')
             return
+        self.shifts = []  # Initialize shifts property
+        self.reference_image = None  # Initialize reference image property
         s = s.replace(',', '.')
         self.PaHHoldingTime = float(s)
         self.draw_geometry()
@@ -985,6 +1021,10 @@ class MainWindow(PyWidgets.QMainWindow):
             else:
                 PyWidgets.QMessageBox.warning(self, 'Error', 'Calibration data not available. Reverting to model-based transformation.')
                 self.TransformSwitch.setChecked(True)
+        
+        self.draw_geometry()
+        self.initialize_scratch_off_points()        
+        
 
 
     def transform_coordinates_image2rl(self, InPoint):
@@ -1001,7 +1041,7 @@ class MainWindow(PyWidgets.QMainWindow):
             # Use calibrated transformation
             OutPoint = transform_coordinates(InPoint, self.calibration_matrix)
 
-        return OutPoint
+        return OutPoint[0:2]
 
     def transform_coordinates_rl2image(self, InPoint):
         InPoint = np.array(InPoint)
@@ -1016,9 +1056,10 @@ class MainWindow(PyWidgets.QMainWindow):
         else:
             # Use calibrated transformation
             # Apply inverse of calibration matrix for reverse transformation
-            inv_calibration_matrix = np.linalg.inv(self.calibration_matrix)
-            OutPoint = transform_coordinates(InPoint, inv_calibration_matrix)
-
+            InvMat = np.linalg.inv(np.array([self.calibration_matrix[0],
+                                             self.calibration_matrix[1],[0, 0, 1]]))
+            # print(InvMat)
+            OutPoint = transform_coordinates(InPoint, InvMat)
         return OutPoint
 
 
@@ -1074,16 +1115,18 @@ class MainWindow(PyWidgets.QMainWindow):
         self.Pixmap = PaintPixmap(self.ImageFullFile)
         self.Image.setPixmap(self.Pixmap)
 
-        # TODO define list of points
-        ListOfPoints = [1, 1]
-        TopLeft = self.transform_coordinates_rl2image([self.LowerPiezoRange, self.LowerPiezoRange])
-        BottomRight = self.transform_coordinates_rl2image([self.UpperPiezoRange, self.UpperPiezoRange])
-        InPoints1 = [TopLeft, BottomRight]
+        TopLeft = self.transform_coordinates_rl2image([self.LowerPiezoRange, self.UpperPiezoRange])
+        TopRight = self.transform_coordinates_rl2image([self.UpperPiezoRange, self.UpperPiezoRange])
+        BottomRight = self.transform_coordinates_rl2image([self.UpperPiezoRange, self.LowerPiezoRange])
+        BottomLeft = self.transform_coordinates_rl2image([self.LowerPiezoRange, self.LowerPiezoRange])
+        InPoints1 = [TopLeft, TopRight,  BottomRight, BottomLeft]
+        # print(InPoints1)
+        # print(f"Window size: {np.linalg.norm(TopLeft - BottomLeft)}")
         self.Pixmap.paintEvent(InPoints1, 'Accessible Area')
         InPoints2 = [
             self.transform_coordinates_rl2image(self.Anchor1),
             self.transform_coordinates_rl2image(self.Anchor2),
-            self.transform_coordinates_rl2image(self.PaHFinalStrainPoint),
+            self.transform_coordinates_rl2image(self.rl2im_im2rl(self.PaHFinalStrainPoint)),
             self.transform_coordinates_rl2image(self.HalfPoint),
             self.transform_coordinates_rl2image(self.PaHBufferPoint)
         ]
@@ -1177,6 +1220,14 @@ class MainWindow(PyWidgets.QMainWindow):
         # ModalDlg.reject()
 
         return Instructions
+    
+    def im2rl_rl2im(self,InPoint):
+        OutPoint = self.transform_coordinates_image2rl(InPoint)
+        return self.transform_coordinates_rl2image(OutPoint)
+    
+    def rl2im_im2rl(self,InPoint):
+        OutPoint = self.transform_coordinates_rl2image(InPoint)
+        return self.transform_coordinates_image2rl(OutPoint)
 
 def main():
     app = PyWidgets.QApplication(sys.argv)
