@@ -116,7 +116,7 @@ class MainWindow(PyWidgets.QMainWindow):
         FullPath = os.path.abspath(str(sys.argv[0]))
         self.ProgramPath = os.path.dirname(FullPath)
 
-        self.DebugMode = True
+        self.DebugMode = False
 
         if len(sys.argv) < 2:
             self.StartingTipPosition = [4.999999e-5, 4.999999e-5]
