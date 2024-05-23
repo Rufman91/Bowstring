@@ -1,13 +1,23 @@
 import numpy as np
 import cv2
-import imageio
 import logging
+from PyQt5.QtGui import QImage
+
+
+def qimage_to_cv2(qimage):
+    qimage = qimage.convertToFormat(QImage.Format_RGB32)
+    width = qimage.width()
+    height = qimage.height()
+    ptr = qimage.bits()
+    ptr.setsize(qimage.byteCount())
+    arr = np.array(ptr).reshape(height, width, 4)
+    return cv2.cvtColor(arr, cv2.COLOR_BGRA2BGR)
 
 def load_images(image_paths):
     images = []
     for path in image_paths:
         logging.debug(f"Loading image from path: {path}")
-        image = imageio.imread(path)
+        image = qimage_to_cv2(QImage(path))
         if image is not None:
             images.append(image)
             logging.debug(f"Loaded image from path: {path}")
@@ -18,8 +28,8 @@ def load_images(image_paths):
 
 def preprocess_image(image):
     # Convert to grayscale
-    # gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray_image = image
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # gray_image = image
     
     # Step 1: Negate the image
     negated_image = cv2.bitwise_not(gray_image)

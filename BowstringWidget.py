@@ -202,7 +202,7 @@ class MainWindow(PyWidgets.QMainWindow):
         self.use_model_based_transformation = True
         self.calibration_phasecorr_shifts = []
         # Load the initial image as reference
-        self.reference_image = imageio.imread(self.ImageFullFile)
+        self.reference_image = load_images([self.ImageFullFile])[0]
         
         print(self.reference_image.dtype, self.reference_image.shape)
         
@@ -688,8 +688,8 @@ class MainWindow(PyWidgets.QMainWindow):
         if len(image_paths) != expected_num_images:
             print(f"Expected {expected_num_images} images, but found {len(image_paths)}")
             return
-    
-        images = [cv2.imread(path) for path in image_paths]
+        
+        images = load_images(image_paths)
         if any(img is None for img in images):
             print("One or more images could not be loaded.")
             return
