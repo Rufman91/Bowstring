@@ -21,7 +21,6 @@ from calibration import load_images, phase_correlation, estimate_transformation,
 import cv2
 import matplotlib.pyplot as plt
 import re
-import imageio
 
 # Exception hook
 def handle_exception(exc_type, exc_value, exc_traceback):
