@@ -20,6 +20,7 @@ import numpy as np
 from calibration import load_images, phase_correlation, estimate_transformation, transform_coordinates, preprocess_image
 import cv2
 import matplotlib.pyplot as plt
+import re
 
 
 # Exception hook
@@ -195,6 +196,8 @@ class MainWindow(PyWidgets.QMainWindow):
         
         self.PixelSize = float(4.65e-6)
         self.Magnification = float(10)
+        self.holding_time_calibration = 0
+        self.grid_size = 5
         self.calibration_matrix = None
         self.use_model_based_transformation = True
         self.calibration_phasecorr_shifts = []
@@ -313,14 +316,16 @@ class MainWindow(PyWidgets.QMainWindow):
         TitleActualCalibration.setFont(PyGui.QFont('Arial', self.TitleFontSize - 2))
         
         GridSizeLabel = PyWidgets.QLabel('Grid Size:')
-        self.GridSizeEdit = PyWidgets.QLineEdit('5')
+        self.GridSizeEdit = PyWidgets.QLineEdit(str(self.grid_size))
         self.GridSizeEdit.setMaxLength(4)
         self.GridSizeEdit.setValidator(PyGui.QIntValidator())
+        self.GridSizeEdit.textChanged.connect(self.set_grid_size)
         
         HoldingTimeLabel = PyWidgets.QLabel('Holding Time [s]:')
-        self.HoldingTimeEdit = PyWidgets.QLineEdit('1.0')
+        self.HoldingTimeEdit = PyWidgets.QLineEdit(str(self.holding_time_calibration))
         self.HoldingTimeEdit.setMaxLength(self.MaxEditLength)
         self.HoldingTimeEdit.setValidator(PyGui.QDoubleValidator())
+        self.HoldingTimeEdit.textChanged.connect(self.set_holding_time_calibration)
 
         self.CalibrateButton = PyWidgets.QPushButton('Start Calibration')
         self.CalibrateButton.clicked.connect(self.start_calibration)
@@ -740,8 +745,8 @@ class MainWindow(PyWidgets.QMainWindow):
 
     def start_calibration_standard(self):
         # Retrieve input values
-        grid_size = int(self.GridSizeEdit.text())
-        holding_time = float(self.HoldingTimeEdit.text())
+        grid_size = self.grid_size
+        holding_time = self.holding_time_calibration
         positioning_velocity = self.PositioningVelocity
     
         # Define movement boundaries
@@ -776,6 +781,7 @@ class MainWindow(PyWidgets.QMainWindow):
         self.wait_for_images(temp_dir, required_images)
     
     def wait_for_images(self, folder, num_images):
+        print(folder)
         while True:
             files = os.listdir(folder)
             if len(files) >= num_images:
@@ -790,13 +796,18 @@ class MainWindow(PyWidgets.QMainWindow):
         # Load images and associate them with AFM positions
         image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.startswith("calibration_image_")]
         
-        logging.debug(f"Expected number of images: 25")
+        logging.debug(f"Expected number of images: {self.grid_size**2}")
         logging.debug(f"Found {len(image_paths)} images in the folder.")
+        
+        # Sort image paths numerically
+        image_paths = sorted(image_paths, key=self.numerical_sort)
         
         images = load_images(image_paths)
         
-        if len(images) != 25:
-            logging.error(f"Number of images loaded ({len(images)}) does not match the expected number (25).")
+        print(image_paths)
+        
+        if len(images) != self.grid_size**2:
+            logging.error(f"Number of images loaded ({len(images)}) does not match the expected number ({self.grid_size**2}).")
             return
         
         if not images:
@@ -957,6 +968,23 @@ class MainWindow(PyWidgets.QMainWindow):
         self.Magnification = float(s)
         self.draw_geometry()
         self.initialize_scratch_off_points()
+        
+    def set_grid_size(self, s):
+        if not s:
+            return
+        s = s.replace(',', '.')
+        self.grid_size = int(s)  # Store the grid size
+        self.draw_geometry()
+        self.initialize_scratch_off_points()
+
+    def set_holding_time_calibration(self, s):
+        if not s:
+            return
+        s = s.replace(',', '.')
+        self.holding_time_calibration = float(s)  # Store the holding time for calibration
+        self.draw_geometry()
+        self.initialize_scratch_off_points()
+
 
     def set_final_strain(self, s):
         if not s:
@@ -1284,6 +1312,12 @@ class MainWindow(PyWidgets.QMainWindow):
     def rl2im_im2rl(self,InPoint):
         OutPoint = self.transform_coordinates_rl2image(InPoint)
         return self.transform_coordinates_image2rl(OutPoint)
+    
+    def numerical_sort(self,value):
+        numbers = re.findall(r'\d+', value)
+        if numbers:
+            return int(numbers[-1])
+        return 0
 
 def main():
     app = PyWidgets.QApplication(sys.argv)
