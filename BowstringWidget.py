@@ -21,7 +21,7 @@ from calibration import load_images, phase_correlation, estimate_transformation,
 import cv2
 import matplotlib.pyplot as plt
 import re
-
+import imageio
 
 # Exception hook
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -202,7 +202,7 @@ class MainWindow(PyWidgets.QMainWindow):
         self.use_model_based_transformation = True
         self.calibration_phasecorr_shifts = []
         # Load the initial image as reference
-        self.reference_image = cv2.imread(self.ImageFullFile)
+        self.reference_image = imageio.imread(self.ImageFullFile)
         
         print(self.reference_image.dtype, self.reference_image.shape)
         
