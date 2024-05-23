@@ -202,9 +202,9 @@ class MainWindow(PyWidgets.QMainWindow):
         self.use_model_based_transformation = True
         self.calibration_phasecorr_shifts = []
         # Load the initial image as reference
-        self.reference_image = cv2.imread(self.ImageFullFile, cv2.IMREAD_COLOR)
+        self.reference_image = cv2.imread(self.ImageFullFile)
         
-        print(self.reference_image.empty())
+        print(self.reference_image.dtype, self.reference_image.shape)
         
         self.PointCounter = 0
         self.Points = list()

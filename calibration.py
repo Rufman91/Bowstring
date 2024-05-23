@@ -12,7 +12,7 @@ def load_images(image_paths):
             logging.debug(f"Loaded image from path: {path}")
         else:
             logging.error(f"Failed to load image from path: {path}")
-        print(image.empty())
+        print(image.dtype,image.shape)
     return images
 
 def preprocess_image(image):
