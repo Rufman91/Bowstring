@@ -249,6 +249,9 @@ cmd = SplitCommand
 p = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,universal_newlines=True)
 Instructions=['Waiting']
 for line in p.stdout:
+    # Print out all lines to the console
+    print(line) # DEBUG: disable when deploying
+    
     if line=='InstructionStart\n':
         Instructions = ['InstructionStart']
     elif line=='InstructionEnd\n' and Instructions[0]=='InstructionStart':

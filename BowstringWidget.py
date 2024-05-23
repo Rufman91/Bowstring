@@ -13,12 +13,50 @@ import time
 import tempfile
 import shutil
 import sys
+import traceback
+import logging
 import os
 import numpy as np
 from calibration import load_images, phase_correlation, estimate_transformation, transform_coordinates, preprocess_image
 import cv2
 import matplotlib.pyplot as plt
 
+
+# Exception hook
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    error_message = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    print("Unhandled exception:", error_message)
+
+    error_dialog = PyWidgets.QMessageBox()
+    error_dialog.setIcon(PyWidgets.QMessageBox.Critical)
+    error_dialog.setText("An unexpected error occurred:")
+    error_dialog.setInformativeText(error_message)
+    error_dialog.setWindowTitle("Error")
+    error_dialog.exec_()
+
+sys.excepthook = handle_exception
+
+# Redirect stderr to capture error messages
+class StreamToLogger:
+    def __init__(self, logger, log_level):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        pass
+
+logging.basicConfig(level=logging.DEBUG)
+stderr_logger = logging.getLogger('STDERR')
+sys.stderr = StreamToLogger(stderr_logger, logging.ERROR)
 
 class PaintPixmap(PyGui.QPixmap):
     def __init__(self, Path):
