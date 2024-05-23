@@ -66,7 +66,7 @@ def phase_correlation(image1, image2):
     shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
     
     # Possibly switch the indexing of the shifts
-    shift = (-shift[0], -shift[1])
+    shift = (shift[0], shift[1])
     
     return shift
 
