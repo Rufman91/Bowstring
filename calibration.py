@@ -1,14 +1,18 @@
 import numpy as np
 import cv2
+import logging
 
 def load_images(image_paths):
     images = []
     for path in image_paths:
+        logging.debug(f"Loading image from path: {path}")
         image = cv2.imread(path)
         if image is not None:
             images.append(image)
+            logging.debug(f"Loaded image from path: {path}")
+        else:
+            logging.error(f"Failed to load image from path: {path}")
     return images
-
 
 def preprocess_image(image):
     # Convert to grayscale
@@ -36,7 +40,6 @@ def preprocess_image(image):
     
     return cleaned_image
 
-
 def phase_correlation(image1, image2):
     # Preprocess images to isolate the cantilever
     image1_preprocessed = preprocess_image(image1)
@@ -49,26 +52,10 @@ def phase_correlation(image1, image2):
     # Compute the phase correlation
     shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
     
-    
     # Possibly switch the indexing of the shifts
     shift = (-shift[0], -shift[1])
     
     return shift
-
-
-
-# def phase_correlation(image1, image2):
-    
-#     # Apply Gaussian blur to reduce high-frequency noise
-#     image1_blur = cv2.GaussianBlur(image1, (51, 51), 0)
-#     image2_blur = cv2.GaussianBlur(image2, (51, 51), 0)
-    
-    
-#     image1_gray = cv2.cvtColor(image1_blur, cv2.COLOR_BGR2GRAY)
-#     image2_gray = cv2.cvtColor(image2_blur, cv2.COLOR_BGR2GRAY)
-
-#     shift, response = cv2.phaseCorrelate(np.float32(image1_gray), np.float32(image2_gray))
-#     return shift
 
 def estimate_transformation(points_image, points_afm):
     transformation_matrix, inliers = cv2.estimateAffine2D(np.array(points_image), np.array(points_afm))

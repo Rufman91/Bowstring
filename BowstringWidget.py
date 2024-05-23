@@ -54,7 +54,15 @@ class StreamToLogger:
     def flush(self):
         pass
 
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+log_file_path = "application.log"
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    handlers=[
+                        logging.FileHandler(log_file_path),
+                        logging.StreamHandler(sys.stdout)
+                    ])
+
 stderr_logger = logging.getLogger('STDERR')
 sys.stderr = StreamToLogger(stderr_logger, logging.ERROR)
 
@@ -780,31 +788,41 @@ class MainWindow(PyWidgets.QMainWindow):
     
     def process_calibration_images(self, folder):
         # Load images and associate them with AFM positions
-        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder))]
+        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.startswith("calibration_image_")]
+        
+        logging.debug(f"Expected number of images: 25")
+        logging.debug(f"Found {len(image_paths)} images in the folder.")
+        
         images = load_images(image_paths)
-    
+        
+        if len(images) != 25:
+            logging.error(f"Number of images loaded ({len(images)}) does not match the expected number (25).")
+            return
+        
+        if not images:
+            logging.error("No images were loaded successfully. Aborting calibration.")
+            return
+        
         # Perform phase correlation
         shifts = []
         for i in range(len(images)):
             shift = phase_correlation(self.reference_image, images[i])
             shifts.append(shift)
-            
+        
         self.calibration_phasecorr_shifts = shifts
-    
         self.use_model_based_transformation = False
         
         # Estimate transformation matrix
         self.recalculate_transformation_matrix()
-        # print("Estimated transformation matrix:", self.calibration_matrix)
-        
         self.TransformSwitch.setChecked(False)
         self.TransformSwitch.setEnabled(True)
         
         self.draw_geometry()
         self.initialize_scratch_off_points()
-    
+        
         # Clean up temporary folder
         shutil.rmtree(folder)
+
 
 
 
