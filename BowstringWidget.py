@@ -203,7 +203,9 @@ class MainWindow(PyWidgets.QMainWindow):
         self.calibration_phasecorr_shifts = []
         # Load the initial image as reference
         self.reference_image = cv2.imread(self.ImageFullFile, cv2.IMREAD_COLOR)
-
+        
+        print(self.reference_image.empty())
+        
         self.PointCounter = 0
         self.Points = list()
 
