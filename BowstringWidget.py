@@ -161,6 +161,7 @@ class MainWindow(PyWidgets.QMainWindow):
 
         FullPath = os.path.abspath(str(sys.argv[0]))
         self.ProgramPath = os.path.dirname(FullPath)
+        self.info_log_path = os.path.expanduser("~")  # Default to user's home directory
 
         self.DebugMode = False
 
@@ -170,6 +171,12 @@ class MainWindow(PyWidgets.QMainWindow):
         else:
             self.StartingTipPosition = np.array([float(sys.argv[1]), float(sys.argv[2])])
             self.ImageFullFile = str(sys.argv[3])
+
+        
+        log_path_button = PyWidgets.QPushButton("Choose Info Log Path")
+        log_path_button.clicked.connect(self.choose_log_path)
+
+        self.log_path_label = PyWidgets.QLabel(f"Current path: {self.info_log_path}")
 
         # Set the window icon
         icon_path = os.path.join(self.ProgramPath, 'icons', 'Bow.jpg')
@@ -348,25 +355,27 @@ class MainWindow(PyWidgets.QMainWindow):
         Grid.addWidget(Input9, 3, 4, 1, 2)
         Grid.addWidget(InputText10, 4, 4)
         Grid.addWidget(Input10, 4, 5)
+        Grid.addWidget(log_path_button,5,4,1,2)
+        Grid.addWidget(self.log_path_label,6,4,1,2)
         
         # Coordinate Transformation Calibration
-        Grid.addWidget(TitleCalibration, 5, 4, 1, 2)
+        Grid.addWidget(TitleCalibration, 7, 4, 1, 2)
 
         # Model-based Transformation
-        Grid.addWidget(TitleModelBased, 6, 4, 1, 2)
-        Grid.addWidget(InputText3, 7, 4)
-        Grid.addWidget(Input3, 7, 5)
-        Grid.addWidget(InputText4, 8, 4)
-        Grid.addWidget(Input4, 8, 5)
-        Grid.addWidget(self.TransformSwitch, 9, 4, 1, 2)
+        Grid.addWidget(TitleModelBased, 8, 4, 1, 2)
+        Grid.addWidget(InputText3, 9, 4)
+        Grid.addWidget(Input3, 9, 5)
+        Grid.addWidget(InputText4, 10, 4)
+        Grid.addWidget(Input4, 10, 5)
+        Grid.addWidget(self.TransformSwitch, 11, 4, 1, 2)
 
         # PhaseCorr. Calibration
-        Grid.addWidget(TitleActualCalibration, 10, 4, 1, 2)
-        Grid.addWidget(GridSizeLabel, 11, 4)
-        Grid.addWidget(self.GridSizeEdit, 11, 5)
-        Grid.addWidget(HoldingTimeLabel, 12, 4)
-        Grid.addWidget(self.HoldingTimeEdit, 12, 5)
-        Grid.addWidget(self.CalibrateButton, 13, 4, 1, 2)
+        Grid.addWidget(TitleActualCalibration, 12, 4, 1, 2)
+        Grid.addWidget(GridSizeLabel, 13, 4)
+        Grid.addWidget(self.GridSizeEdit, 13, 5)
+        Grid.addWidget(HoldingTimeLabel, 14, 4)
+        Grid.addWidget(self.HoldingTimeEdit, 14, 5)
+        Grid.addWidget(self.CalibrateButton, 15, 4, 1, 2)
 
         # Pull and Hold settings
         Title1 = PyWidgets.QLabel('Pull and Hold')
@@ -499,6 +508,12 @@ class MainWindow(PyWidgets.QMainWindow):
         # self.setGeometry(200, 200, 300, 600)
         self.show()
         
+    def choose_log_path(self):
+        # Open a dialog to select the folder for saving log files
+        directory = PyWidgets.QFileDialog.getExistingDirectory(self, "Select Log Directory", self.info_log_path)
+        if directory:
+            self.info_log_path = directory
+            self.log_path_label.setText(f"Current path: {self.info_log_path}")
 
 
     def start_calibration(self):
@@ -1111,7 +1126,6 @@ class MainWindow(PyWidgets.QMainWindow):
         self.initialize_scratch_off_points()        
         
 
-
     def transform_coordinates_image2rl(self, InPoint):
         InPoint = np.array(InPoint)
         if self.use_model_based_transformation:
@@ -1224,6 +1238,8 @@ class MainWindow(PyWidgets.QMainWindow):
         self.StartPaHPCButton.setEnabled(Bool)
 
     def send_instructions_pull_and_hold(self, event):
+        self.log_pull_and_hold_info()
+        
         InList = [['PullAndHold', str(self.RecordRealTimeScan), str(self.RecordVideo), str(self.RecordVideoNthFrame)],
                   [str(self.PaHBufferPoint[0]), str(self.PaHBufferPoint[1]), str(self.PositioningVelocity), '0', 'Retracted'],
                   [str(self.HalfPoint[0]), str(self.HalfPoint[1]), str(self.PaHStrainRate), '0', 'Approached'],
@@ -1313,6 +1329,52 @@ class MainWindow(PyWidgets.QMainWindow):
     def rl2im_im2rl(self,InPoint):
         OutPoint = self.transform_coordinates_rl2image(InPoint)
         return self.transform_coordinates_image2rl(OutPoint)
+    
+    def log_pull_and_hold_info(self):
+        # Prepare log content
+        log_content = []
+        log_content.append("Coordinate Transformation Matrix:")
+        if self.calibration_matrix is not None:
+            log_content.append(str(self.calibration_matrix))
+        else:
+            log_content.append("Not available")
+    
+        log_content.append("\nSettings:")
+        log_content.append(f"Positioning Velocity: {self.PositioningVelocity}")
+        log_content.append(f"Record Real Time Scan: {self.RecordRealTimeScan}")
+        log_content.append(f"Record Video: {self.RecordVideo}")
+        log_content.append(f"Record Video Nth Frame: {self.RecordVideoNthFrame}")
+        log_content.append(f"Pixel Size: {self.PixelSize}")
+        log_content.append(f"Magnification: {self.Magnification}")
+        log_content.append(f"Holding Time Calibration: {self.holding_time_calibration}")
+        log_content.append(f"Grid Size: {self.grid_size}")
+        log_content.append(f"Strain Rate: {self.PaHStrainRate}")
+        log_content.append(f"Final Strain: {self.PaHFinalStrain}")
+        log_content.append(f"Tip-to-Halfpoint Buffer: {self.PaHTip2HalfPointBuffer}")
+        log_content.append(f"Holding Time: {self.PaHHoldingTime}")
+    
+        log_content.append("\nDistances (real world):")
+        log_content.append(f"Anchor 1 to Anchor 2: {np.linalg.norm(self.Anchor1 - self.Anchor2)}")
+        log_content.append(f"Anchor to Final Strain Point: {np.linalg.norm(self.Anchor1 - self.PaHFinalStrainPoint)}")
+        log_content.append(f"Mid Point to Final Strain Point: {np.linalg.norm(self.HalfPoint - self.PaHFinalStrainPoint)}")
+    
+        log_content.append("\nDistances (pixel world):")
+        anchor1_pixel = np.array(self.Points[0])
+        anchor2_pixel = np.array(self.Points[1])
+        final_strain_pixel = np.array(self.rl2im_im2rl(self.PaHFinalStrainPoint))
+        mid_point_pixel = np.array(self.rl2im_im2rl(self.HalfPoint))
+    
+        log_content.append(f"Anchor 1 to Anchor 2: {np.linalg.norm(anchor1_pixel - anchor2_pixel)}")
+        log_content.append(f"Anchor to Final Strain Point: {np.linalg.norm(anchor1_pixel - final_strain_pixel)}")
+        log_content.append(f"Mid Point to Final Strain Point: {np.linalg.norm(mid_point_pixel - final_strain_pixel)}")
+    
+        # Write log to file
+        log_file_name = os.path.join(self.info_log_path, f"PullAndHold_Log_{time.strftime('%Y%m%d-%H%M%S')}.txt")
+        with open(log_file_name, 'w') as log_file:
+            log_file.write("\n".join(log_content))
+        
+        logging.info(f"Pull and Hold experiment info logged to {log_file_name}")
+
     
     def numerical_sort(self,value):
         numbers = re.findall(r'\d+', value)
