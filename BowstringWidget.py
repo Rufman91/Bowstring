@@ -1361,12 +1361,27 @@ class MainWindow(PyWidgets.QMainWindow):
         log_content.append("\nDistances (pixel world):")
         anchor1_pixel = np.array(self.Points[0])
         anchor2_pixel = np.array(self.Points[1])
-        final_strain_pixel = np.array(self.rl2im_im2rl(self.PaHFinalStrainPoint))
-        mid_point_pixel = np.array(self.rl2im_im2rl(self.HalfPoint))
+        final_strain_pixel = np.array(self.transform_coordinates_rl2image(self.PaHFinalStrainPoint))
+        mid_point_pixel = np.array(self.transform_coordinates_rl2image(self.HalfPoint))
     
         log_content.append(f"Anchor 1 to Anchor 2: {np.linalg.norm(anchor1_pixel - anchor2_pixel)}")
         log_content.append(f"Anchor to Final Strain Point: {np.linalg.norm(anchor1_pixel - final_strain_pixel)}")
         log_content.append(f"Mid Point to Final Strain Point: {np.linalg.norm(mid_point_pixel - final_strain_pixel)}")
+        
+        log_content.append("\nAbsolute positions (real world):")
+        log_content.append(f"Anchor 1: {self.Anchor1}")
+        log_content.append(f"Anchor 2: {self.Anchor2}")
+        log_content.append(f"Half Point: {self.HalfPoint}")
+        log_content.append(f"Buffer Point: {self.PaHBufferPoint}")
+        log_content.append(f"Final Strain Point: {self.PaHFinalStrainPoint}")
+        
+        log_content.append("\nAbsolute positions (pixel world):")
+        log_content.append(f"Anchor 1: {self.Points[0]}")
+        log_content.append(f"Anchor 2: {self.Points[1]}")
+        log_content.append(f"Half Point: {self.transform_coordinates_rl2image(self.HalfPoint)}")
+        log_content.append(f"Buffer Point: {self.transform_coordinates_rl2image(self.PaHBufferPoint)}")
+        log_content.append(f"Final Strain Point: {self.transform_coordinates_rl2image(self.PaHFinalStrainPoint)}")
+
     
         # Write log to file
         log_file_name = os.path.join(self.info_log_path, f"PullAndHold_Log_{time.strftime('%Y%m%d-%H%M%S')}.txt")
