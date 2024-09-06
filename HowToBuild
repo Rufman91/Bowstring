@@ -1,1 +1,5 @@
+SDT4 Specific:
 pyinstaller BowstringWidget.py --distpath ~/jpkdata/Jaritz_Simon_AFM/BowstringApp/dist --workpath ~/jpkdata/Jaritz_Simon_AFM/BowstringApp/build --add-data "/home/jpkuser/Documents/GitHub/Bowstring/TestImage.tif:." --add-data "/home/jpkuser/Documents/GitHub/Bowstring/icons/:./icons"
+
+General:
+pyinstaller BowstringWidget.py --distpath <path/to/where/the/app/should/be>/dist --workpath <path/to/where/the/app/should/be>/build --add-data "<full/path/to/Bowstring/repository>/TestImage.jpg:." --add-data "<full/path/to/Bowstring/repository>/icons/:./icons"

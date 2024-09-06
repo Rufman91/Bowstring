@@ -203,8 +203,11 @@ def parse_and_execute_instructions(InList, TTLInstance, TargetDir, RootName):
 #######################################################################
 
 
-# DEAR USER: First, set target directory and file name root
-# Then just press 'Run' up above in the Experiment Planner
+# DEAR USER: First, set target directory and file name root for the outputs.
+# Then just press 'Run' up above in the Experiment Planner.
+# Make sure to also set the correct path to the compiled BowstringWidget further
+# below!
+
 TargetDir = "/home/jpkuser/jpkdata/Jaritz_Simon_AFM/2022_09_23-BowstringStretching/"
 RootName = "Image2Piezo-PrecisionTest"
 
@@ -233,6 +236,10 @@ DT = datetime.now().isoformat().replace('.','-').replace(':','-')
 ImagePath = os.path.join(TargetDir,RootName + '_InImage_' + DT)
 Snapshooter.saveOpticalSnapshot(ImagePath)
 Scanner.retractPiezo()
+
+# The following 'FullCommand' is used to call the external App 'BowstringWidget'.
+# This is the path to the compiled exectuable. A guide on how to compile the widget
+# can be found in the repositories README file
 
 FullCommand = """./jpkdata/Jaritz_Simon_AFM/BowstringApp/dist/BowstringWidget/BowstringWidget
 %e %e "%s"
